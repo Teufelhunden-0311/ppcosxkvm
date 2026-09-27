@@ -32,7 +32,7 @@ without the word `run`: `ppcosx --vga` is `ppcosx run --vga`.
 | `--vram MB` | 128 | Radeon video memory: 64, 128 or 256. The real 9700 PRO has 128. |
 | `--res WxH` | 1024x768 | Initial screen size. The Radeon mode is tested at 1024×768; other sizes are experimental. |
 | `--rom PATH` / `--no-rom` | `vm/roms/radeon9700.rom` if present | Radeon option ROM. |
-| `--cd PATH` | | Attach a CD/DVD image, e.g. to install software from a disc. |
+| `--attach-dvd IMG` (or `--dvd`, `--cd`) | | Insert a DVD/CD image (`.iso` `.cdr` `.dmg` `.toast`), e.g. to install software from a disc. A `.dmg` is converted once to a raw `.cdr` in the VM folder (QEMU can't read compressed `.dmg`s). |
 | `--verbose` | off | Text-mode ("verbose") boot instead of the grey Apple. Good for diagnosing hangs. |
 | `--snapshot` | off | Throwaway session: all disk writes are discarded when QEMU exits. The disk must not be in use by another VM. |
 | `--ssh-port N` | | Forward `127.0.0.1:N` on the host to the guest's SSH (turn on *Remote Login* in the guest's Sharing preferences). |
@@ -45,7 +45,7 @@ Examples:
 ```bash
 ppcosx --ram 2048                           # more memory
 ppcosx --snapshot                           # try something risky
-ppcosx run --cd ~/Discs/Photoshop7.iso      # install software from a disc image
+ppcosx --attach-dvd ~/Discs/Photoshop7.dmg  # insert a disc image (.iso .dmg .cdr .toast)
 ppcosx run --ssh-port 2222                  # then: ssh -p 2222 user@127.0.0.1
 ppcosx run -- -serial stdio                 # extra QEMU flags
 ```
@@ -71,7 +71,7 @@ drive.
 | `vm/macosx.qcow2` | The guest disk. Grows as it's used. |
 | `vm/roms/radeon9700.rom` | Optional ROM, installed by `ppcosx rom`. |
 | `vm/gpu-trace.log` | GPU log: first-use notices for 3D features and the texture formats seen. Rewritten on each boot. |
-| `vm/installer-*.cdr` | Raw copies of `.dmg` installers made by `ppcosx install`. Safe to delete after installing. |
+| `vm/dvd-*.cdr` | Raw copies of `.dmg` disc images, made by `--attach-dvd` and `ppcosx install`. Safe to delete; they're remade when needed. |
 
 ## Snapshots
 
@@ -98,4 +98,4 @@ written to the disk at all.
   Tiger's OpenSSH is old; from a modern Mac you may need
   `ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -p 2222 user@127.0.0.1`.
 * **Disc images**: `hdiutil makehybrid -hfs -iso -o files.iso some-folder/`
-  on the Mac, then `ppcosx run --cd files.iso`.
+  on the Mac, then `ppcosx --attach-dvd files.iso`.

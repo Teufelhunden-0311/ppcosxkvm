@@ -73,6 +73,10 @@ disk_size() {    # virtual size in bytes
         /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["virtual-size"])'
 }
 
+disk_in_use() {   # is a QEMU on this machine running this exact disk path?
+    ps -axww -o command= 2>/dev/null | grep -F "qemu-system-ppc" | grep -qF "file.filename=$1,"
+}
+
 port_free() { ! lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
 
 # ------------------------------------------------------------------ help ---
@@ -91,6 +95,7 @@ ${B}First time${N}
 ${B}Every day${N}
   ppcosx                       boot the VM with the Radeon 9700 (3D acceleration)
   ppcosx --vga                 boot with a plain framebuffer (safe mode)
+  ppcosx --attach-dvd <file>   boot with a DVD/CD image inserted (.iso .dmg ...)
   ppcosx --ram 2048 --verbose  any run option works directly (see below)
   ppcosx doctor                check that everything is in place
 
@@ -112,7 +117,7 @@ ${B}Run options${N} (for "ppcosx", "ppcosx run" and "ppcosx install")
   --rom PATH       Radeon ROM to use         (default: vm/roms/radeon9700.rom if present)
   --no-rom         boot without the ROM, even if one is installed
   --vga            plain framebuffer instead of the Radeon
-  --cd PATH        also attach a CD/DVD image
+  --attach-dvd IMG DVD/CD image to insert: .iso .cdr .dmg .toast (also --dvd)
   --verbose        verbose (text) boot instead of the grey Apple
   --snapshot       throw away all disk writes when the VM quits
   --ssh-port N     forward host 127.0.0.1:N to guest port 22
@@ -354,7 +359,7 @@ cmd_snapshot() {
     local disk="$DISK_DEFAULT" action="${1:-list}"
     [ $# -gt 0 ] && shift
     [ -f "$disk" ] || die "no disk at ${disk#$REPO/}"
-    if pgrep -f "qemu-system-ppc.*$(basename "$disk")" >/dev/null 2>&1; then
+    if disk_in_use "$disk"; then
         die "the VM is running; shut it down first"
     fi
     case "$action" in
@@ -366,6 +371,28 @@ cmd_snapshot() {
         delete)  [ $# = 1 ] || die "usage: $PROG snapshot delete <name>"
                  qemu_img snapshot -d "$1" "$disk" && ok "deleted snapshot '$1'" ;;
         *) die "usage: $PROG snapshot list|save|restore|delete [name]" ;;
+    esac
+}
+
+# Resolve a DVD/CD image into something QEMU can read; sets DVD_PATH.
+# .iso .cdr .toast are used as-is.  A .dmg is usually compressed UDIF,
+# which QEMU can't read, so it's converted once (hdiutil) to a raw .cdr
+# kept in the VM folder, and redone if the .dmg is newer.
+dvd_image() {
+    local src="$1" cdr
+    [ -f "$src" ] || die "no such DVD image: $src"
+    case "$src" in
+        *.dmg|*.DMG)
+            cdr="$VM_DIR/dvd-$(basename "${src%.*}").cdr"
+            if [ ! -f "$cdr" ] || [ "$src" -nt "$cdr" ]; then
+                say "Converting $(basename "$src") to a raw DVD image (one time)"
+                mkdir -p "$VM_DIR"
+                rm -f "$cdr"
+                hdiutil convert "$src" -format UDTO -o "${cdr%.cdr}" -quiet \
+                    || die "hdiutil could not convert $src"
+            fi
+            DVD_PATH="$cdr" ;;
+        *) DVD_PATH="$src" ;;
     esac
 }
 
@@ -410,7 +437,9 @@ parse_run_opts() {
             --res) RES="$2"; shift ;;
             --rom) ROM=$(abspath "$2"); shift ;;
             --no-rom) ROM= ;;
-            --cd) CD=$(abspath "$2"); shift ;;
+            --attach-dvd|--dvd|--cd)
+                [ $# -ge 2 ] || die "$1 needs a path to a .iso, .cdr, .dmg or .toast"
+                CD=$(abspath "$2"); shift ;;
             --vga) MODE=vga ;;
             --verbose|-v) VERBOSE=1 ;;
             --snapshot) SNAPSHOT=1 ;;
@@ -427,7 +456,7 @@ parse_run_opts() {
     [ "$RAM" -ge 256 ] && [ "$RAM" -le 2048 ] || die "--ram must be 256-2048 (mac99 limit is 2 GB)"
     case "$VRAM" in 64|128|256) ;; *) die "--vram must be 64, 128 or 256" ;; esac
     case "$RES" in [0-9]*x[0-9]*) ;; *) die "--res looks like 1024x768" ;; esac
-    [ -z "$CD" ] || [ -f "$CD" ] || die "no such CD image: $CD"
+    [ -z "$CD" ] || [ -f "$CD" ] || die "no such DVD image: $CD"
     if [ -n "$ROM" ]; then
         [ -f "$ROM" ] || die "no such ROM: $ROM"
         local info; info=$(rom_check "$ROM" 2>&1) || die "$ROM: $info"
@@ -440,7 +469,7 @@ cmd_run() {
     [ -f "$DISK" ] || die "no disk at ${DISK#$REPO/}
     Install Mac OS X first:  $PROG install <tiger.iso>
     or bring a disk:         $PROG import <disk.vmdk|.qcow2|.utm>"
-    if pgrep -f "qemu-system-ppc.*$(basename "$DISK")" >/dev/null 2>&1; then
+    if disk_in_use "$DISK"; then
         die "a VM is already running on $(basename "$DISK"); shut it down first"
     fi
 
@@ -448,7 +477,8 @@ cmd_run() {
     [ "$VERBOSE" = 1 ] && QARGS+=(-prom-env 'boot-args=-v')
     QARGS+=(-usb -device usb-mouse,bus=usb-bus.0 -device usb-kbd,bus=usb-bus.0)
     if [ -n "$CD" ]; then
-        QARGS+=(-drive "if=none,media=cdrom,id=cd,readonly=on,file=$CD"
+        dvd_image "$CD"
+        QARGS+=(-drive "if=none,media=cdrom,id=cd,readonly=on,file=$DVD_PATH"
                 -device ide-cd,bus=ide.0,unit=1,drive=cd)
     fi
 
@@ -525,17 +555,8 @@ cmd_install() {
     [ -n "$iso" ] || die "usage: $PROG install <Mac OS X install DVD: .iso .cdr .dmg .toast> [--size 40G]"
     [ -f "$iso" ] || die "no such file: $iso"
 
-    case "$iso" in
-        *.dmg)   # Compressed UDIF images need converting to a raw CD image first.
-            local cdr="$VM_DIR/installer-$(basename "${iso%.*}").cdr"
-            if [ ! -f "$cdr" ]; then
-                say "Converting $(basename "$iso") to a raw DVD image (one time)"
-                mkdir -p "$VM_DIR"
-                hdiutil convert "$iso" -format UDTO -o "${cdr%.cdr}" -quiet \
-                    || die "hdiutil could not convert $iso"
-            fi
-            iso="$cdr" ;;
-    esac
+    dvd_image "$iso"
+    iso="$DVD_PATH"
 
     parse_run_opts ${args[@]+"${args[@]}"}
     if [ ! -f "$DISK" ]; then

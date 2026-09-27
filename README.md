@@ -50,6 +50,7 @@ and boot it:
 ```bash
 ppcosx            # with the Radeon 9700 (3D acceleration)
 ppcosx --vga      # safe mode: plain framebuffer
+ppcosx --attach-dvd ~/Discs/SomeApp.dmg   # boot with a disc image inserted
 ```
 
 `ppcosx doctor` checks everything, `ppcosx update` gets the latest version,
