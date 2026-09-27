@@ -55,7 +55,7 @@ human_size() {   # bytes -> "20 GB"
 }
 
 disk_size() {    # virtual size in bytes
-    qemu_img info --output=json "$1" 2>/dev/null |
+    qemu_img info -U --output=json "$1" 2>/dev/null |
         /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["virtual-size"])'
 }
 
@@ -81,7 +81,8 @@ ${B}Every day${N}
   ./ppcosx doctor                check that everything is in place
 
 ${B}Disks${N}
-  ./ppcosx new-disk [size]       create an empty disk (default 40G)
+  ./ppcosx new-disk [size] [path]
+                                 create an empty disk (default 40G at vm/macosx.qcow2)
   ./ppcosx snapshot list|save|restore|delete [name]
                                  disk snapshots (VM must be shut down)
 
@@ -91,6 +92,7 @@ ${B}run options${N}
   --vram MB        Radeon video memory 64/128/256 (default: 128)
   --res WxH        screen size               (default: 1024x768)
   --rom PATH       Radeon ROM to use         (default: vm/roms/radeon9700.rom if present)
+  --no-rom         boot without the ROM, even if one is installed
   --cd PATH        also attach a CD/DVD image
   --verbose        verbose (text) boot instead of the grey Apple
   --snapshot       throw away all disk writes when the VM quits
@@ -403,8 +405,8 @@ cmd_run() {
     [ -f "$DISK" ] || die "no disk at ${DISK#$REPO/}
     Install Mac OS X first:  ./ppcosx install <tiger.iso>
     or bring a disk:         ./ppcosx import <disk.vmdk|.qcow2|.utm>"
-    if pgrep -f "qemu-system-ppc.*$(basename "$DISK")" >/dev/null 2>&1 && [ "$SNAPSHOT" = 0 ]; then
-        die "a VM is already running on $(basename "$DISK") (use --snapshot to boot a throwaway copy)"
+    if pgrep -f "qemu-system-ppc.*$(basename "$DISK")" >/dev/null 2>&1; then
+        die "a VM is already running on $(basename "$DISK"); shut it down first"
     fi
 
     build_common "$DISK"

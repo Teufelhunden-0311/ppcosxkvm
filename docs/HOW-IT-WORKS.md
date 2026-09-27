@@ -19,7 +19,7 @@ guest  │ WindowServer (Quartz Extreme)  Core Image   OpenGL apps
        │   ATIRadeon9700.kext ── MMIO registers, command ring, GART
 ───────┼───────────┼──────────────────────────────────────┼──────────
 QEMU   │   ati-radeon-9700 device (hw/display/ppc_mac_gpu.c)
-       │     ├─ PCI config, BARs (256 MB VRAM/aperture, MMIO), AGP
+       │     ├─ PCI config, BARs (VRAM apertures, MMIO), AGP
        │     ├─ CP: ring buffer, indirect buffers, PM4 packets,
        │     │   scratch/fence write-backs, 2D blits
        │     ├─ R300 3D state (hw/display/r300/r300_state.c)
@@ -116,8 +116,9 @@ slow.
 * **Tiling** (macro/micro tile bits) is ignored. That's consistent as long
   as only the GPU touches tiled buffers, which is true for everything
   tested.
-* **VRAM in System Profiler** shows the 256 MB BAR size, not
-  `--vram`.
+* **VRAM in System Profiler** shows the size of the VRAM BAR, which
+  holds two apertures onto VRAM: twice `--vram`, so 256 MB at the
+  default 128.
 * **Leopard** (10.5) has an R300 driver too, but hasn't been tested.
 * Not implemented: video decode acceleration (`ATIRadeon9700VADriver`),
   TV out, dual-head.

@@ -5,7 +5,7 @@ Start the VM with `./ppcosx run --monitor`, then:
 
     tools/vmctl.py cmd '<HMP command>'     e.g. cmd 'info pci'
     tools/vmctl.py type 'text'             type into the guest
-    tools/vmctl.py key cmd-q               one key combo (HMP sendkey syntax)
+    tools/vmctl.py key meta_l-q            one key combo (HMP sendkey syntax)
     tools/vmctl.py shot out.png            screenshot
     tools/vmctl.py click X Y [right]       click / dclick / move / drag x0 y0 x1 y1
 
