@@ -20,7 +20,7 @@ FW_VGA="$REPO/firmware/vga"
 DISK_DEFAULT="$VM_DIR/macosx.qcow2"
 ROM_DEFAULT="$VM_DIR/roms/radeon9700.rom"
 RADEON_SLOT=e         # PCI slot of the Radeon; names its device-tree node
-BREW_DEPS="ninja pkgconf glib pixman libslirp"
+BREW_DEPS="ninja pkgconf glib pixman libslirp python-setuptools"
 
 # ---------------------------------------------------------------- output ---
 if [ -t 1 ]; then
@@ -155,7 +155,16 @@ cmd_setup() {
     say "Building QEMU (qemu-system-ppc only; this takes a few minutes)"
     mkdir -p "$QEMU_BUILD"
     if [ ! -f "$QEMU_BUILD/build.ninja" ]; then
-        (cd "$QEMU_BUILD" && ../configure \
+        # Use Homebrew's own python3 (a glib dependency), not whatever is
+        # first on PATH: a python3 left over from an Intel Homebrew runs
+        # under Rosetta and makes meson configure an x86_64 build, which
+        # then fails on -mcx16/-msse2. python-setuptools in BREW_DEPS lets
+        # QEMU's venv reuse Homebrew's pip; without it, mkvenv runs ensurepip,
+        # whose pip lacks the distlib.version that mkvenv needs.
+        local py
+        py="$(brew --prefix)/opt/python@3/libexec/bin/python3"
+        [ -x "$py" ] || py=python3
+        (cd "$QEMU_BUILD" && ../configure --python="$py" \
             --target-list=ppc-softmmu --disable-docs --disable-sdl \
             --disable-werror -Doptimization=2) \
             > "$QEMU_BUILD/ppcosx-configure.log" 2>&1 \
@@ -481,7 +490,7 @@ cmd_install() {
         case "$1" in
             --size) size="$2"; shift ;;
             --disk|--ram|--res) args+=("$1" "$2"); shift ;;
-            --verbose|-v) args+=("$1") ;;
+            --verbose|-v|--monitor) args+=("$1") ;;
             -*) die "unknown option $1" ;;
             *) iso=$(abspath "$1") ;;
         esac

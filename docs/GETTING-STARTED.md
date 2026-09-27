@@ -40,7 +40,8 @@ need. `setup` fetches just the QEMU fork.
 `setup`:
 
 1. checks that this is a Mac with the Command Line Tools and Homebrew,
-2. `brew install`s `ninja pkgconf glib pixman libslirp` (only the missing ones),
+2. `brew install`s `ninja pkgconf glib pixman libslirp python-setuptools`
+   (only the missing ones),
 3. fetches the QEMU fork into `qemu/` (a shallow git submodule, several
    hundred MB),
 4. configures and builds `qemu-system-ppc` and `qemu-img` into `qemu/build/`.
@@ -94,6 +95,17 @@ The disk has to contain **PowerPC** Mac OS X. An Intel ("x86") OS X disk
 won't boot on this emulated G4.
 
 ## 4. Boot
+
+If you installed from an original 10.4 DVD, update to 10.4.11 first. The
+Radeon driver in 10.4.0 (build 8A428) panics on the emulated card. Boot
+with the plain framebuffer and the Combo Update attached, run Setup
+Assistant, install the update, then shut down:
+
+```bash
+./ppcosx run --vga --cd ~/Downloads/MacOSXUpdCombo10.4.11PPC.iso
+```
+
+Then boot with the Radeon:
 
 ```bash
 ./ppcosx run

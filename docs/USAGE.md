@@ -9,7 +9,7 @@
 |---|---|
 | `./ppcosx setup` | Install build dependencies and build QEMU. Safe to re-run; it updates the build after a `git pull`. |
 | `./ppcosx doctor` | Check the host, the build, the firmware checksums, your disk and ROM. |
-| `./ppcosx install <dvd> [--size 40G] [--disk PATH]` | Boot a Mac OS X install DVD image (`.iso` `.cdr` `.dmg` `.toast`) with an empty disk attached. See [GETTING-STARTED.md](GETTING-STARTED.md#3a-install-tiger-from-a-dvd-image). |
+| `./ppcosx install <dvd> [--size 40G] [--disk PATH] [--monitor]` | Boot a Mac OS X install DVD image (`.iso` `.cdr` `.dmg` `.toast`) with an empty disk attached. See [GETTING-STARTED.md](GETTING-STARTED.md#3a-install-tiger-from-a-dvd-image). |
 | `./ppcosx import <image> [--as PATH] [--force]` | Copy an existing PowerPC OS X disk (`.qcow2` `.vmdk` `.vdi` `.vhd` `.img`, or a `.utm` bundle) to `vm/macosx.qcow2`. |
 | `./ppcosx run [options]` | Boot the disk with the emulated Radeon 9700 PRO. |
 | `./ppcosx run --vga` | Boot with a plain framebuffer and no Radeon: safe mode. |
