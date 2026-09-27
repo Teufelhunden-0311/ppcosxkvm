@@ -110,7 +110,10 @@ slow.
 ## Limitations
 
 * **One CPU, emulated.** The guest is a single-CPU G4. Apps bound by the
-  CPU run at old-Mac speeds.
+  CPU run at old-Mac speeds. The *reported* speed is 2 GHz by default
+  (`--cpu-mhz`; QEMU normally says 900 MHz) so that apps with minimum
+  requirements, such as Aperture, see a capable Mac. Guest timing uses the
+  separate timebase clock, so the reported figure doesn't affect behaviour.
 * **Resolution.** The Radeon mode is tested at 1024×768. Other `--res`
   sizes are experimental.
 * **Tiling** (macro/micro tile bits) is ignored. That's consistent as long

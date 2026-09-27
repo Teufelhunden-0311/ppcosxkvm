@@ -33,6 +33,7 @@ FW_RADEON="$REPO/firmware/radeon"
 FW_VGA="$REPO/firmware/vga"
 DISK_DEFAULT="$VM_DIR/macosx.qcow2"
 ROM_DEFAULT="$VM_DIR/roms/radeon9700.rom"
+CPU_MHZ_DEFAULT=2000  # CPU speed Mac OS X is told (reporting only; QEMU says 900)
 RADEON_SLOT=e         # PCI slot of the Radeon; names its device-tree node
 BREW_DEPS="ninja pkgconf glib pixman libslirp"
 
@@ -112,6 +113,7 @@ ${B}Maintenance${N}
 ${B}Run options${N} (for "ppcosx", "ppcosx run" and "ppcosx install")
   --disk PATH      disk image to boot        (default: vm/macosx.qcow2)
   --ram MB         guest memory, 256-2048    (default: 1024)
+  --cpu-mhz N      CPU speed Mac OS X sees   (default: $CPU_MHZ_DEFAULT; reporting only)
   --vram MB        Radeon video memory 64/128/256 (default: 128)
   --res WxH        screen size               (default: 1024x768)
   --rom PATH       Radeon ROM to use         (default: vm/roms/radeon9700.rom if present)
@@ -399,10 +401,18 @@ dvd_image() {
 # ------------------------------------------------------------------- run ---
 # Shared by run and install.  Sets the global array QARGS.
 build_common() {   # $1 = disk, $2 = "cd" when booting from CD
+    # cpu-mhz is a machine option of this repo's QEMU; an older build
+    # (git pull without ppcosx update) doesn't have it yet.
+    MACHINE="mac99,via=pmu"
+    if "$QEMU" -machine mac99,help 2>/dev/null | grep -q cpu-mhz; then
+        MACHINE="$MACHINE,cpu-mhz=$CPU_MHZ"
+    else
+        warn "this QEMU build can't set the CPU speed; run: $PROG update"
+    fi
     local hdboot=,bootindex=0
     [ "${2:-}" = cd ] && hdboot=
     QARGS=(-nodefaults -vga none
-        -machine mac99,via=pmu -accel tcg,tb-size=256
+        -machine "$MACHINE" -accel tcg,tb-size=256
         -smp cpus=1,sockets=1,cores=1,threads=1 -m "$RAM"
         -display cocoa -audio coreaudio
         -drive "if=none,media=disk,id=hd,file.filename=$1,discard=unmap,detect-zeroes=unmap"
@@ -426,6 +436,7 @@ add_net() {
 
 parse_run_opts() {
     DISK="$DISK_DEFAULT"; RAM=1024; VRAM=128; RES=1024x768; ROM=; CD=
+    CPU_MHZ="${PPCOSX_CPU_MHZ:-$CPU_MHZ_DEFAULT}"
     VERBOSE=0; SNAPSHOT=0; SSH_PORT=; MONITOR=0; TRACE=0; MODE=radeon
     EXTRA=()
     [ -f "$ROM_DEFAULT" ] && ROM="$ROM_DEFAULT"
@@ -433,6 +444,7 @@ parse_run_opts() {
         case "$1" in
             --disk) DISK=$(abspath "$2"); shift ;;
             --ram) RAM="$2"; shift ;;
+            --cpu-mhz) CPU_MHZ="$2"; shift ;;
             --vram) VRAM="$2"; shift ;;
             --res) RES="$2"; shift ;;
             --rom) ROM=$(abspath "$2"); shift ;;
@@ -455,6 +467,8 @@ parse_run_opts() {
     case "$RAM" in ''|*[!0-9]*) die "--ram takes a number of MB" ;; esac
     [ "$RAM" -ge 256 ] && [ "$RAM" -le 2048 ] || die "--ram must be 256-2048 (mac99 limit is 2 GB)"
     case "$VRAM" in 64|128|256) ;; *) die "--vram must be 64, 128 or 256" ;; esac
+    case "$CPU_MHZ" in ''|*[!0-9]*) die "--cpu-mhz takes a number of MHz" ;; esac
+    [ "$CPU_MHZ" -ge 100 ] && [ "$CPU_MHZ" -le 4000 ] || die "--cpu-mhz must be 100-4000"
     case "$RES" in [0-9]*x[0-9]*) ;; *) die "--res looks like 1024x768" ;; esac
     [ -z "$CD" ] || [ -f "$CD" ] || die "no such DVD image: $CD"
     if [ -n "$ROM" ]; then
@@ -545,7 +559,7 @@ cmd_install() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --size) size="$2"; shift ;;
-            --disk|--ram|--res) args+=("$1" "$2"); shift ;;
+            --disk|--ram|--res|--cpu-mhz) args+=("$1" "$2"); shift ;;
             --verbose|-v) args+=("$1") ;;
             -*) die "unknown option $1" ;;
             *) iso=$(abspath "$1") ;;

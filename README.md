@@ -87,6 +87,7 @@ Other handy ways to start it:
 | `ppcosx --vga` | **Safe mode**: simple graphics, if something looks wrong |
 | `ppcosx --attach-dvd ~/Discs/App.dmg` | Start with a CD/DVD image inserted, e.g. to install software |
 | `ppcosx --ram 2048` | Give it more memory (up to 2048 MB) |
+| `ppcosx --cpu-mhz 2500` | Change the CPU speed Mac OS X sees (default 2 GHz); it doesn't make it faster |
 | `ppcosx --snapshot` | Try something risky: nothing you do is saved |
 | `ppcosx doctor` | Check that everything is set up correctly |
 | `ppcosx update` | Get the latest version |

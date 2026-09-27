@@ -29,6 +29,7 @@ without the word `run`: `ppcosx --vga` is `ppcosx run --vga`.
 |---|---|---|
 | `--disk PATH` | `vm/macosx.qcow2` | Disk image to boot. |
 | `--ram MB` | 1024 | Guest memory, 256–2048. The Power Mac G4 (mac99) tops out at 2 GB. |
+| `--cpu-mhz N` | 2000 | CPU speed Mac OS X is *told* (100–4000). Shown in About This Mac and checked by apps with minimum requirements. It doesn't change how fast the emulation actually runs. |
 | `--vram MB` | 128 | Radeon video memory: 64, 128 or 256. The real 9700 PRO has 128. |
 | `--res WxH` | 1024x768 | Initial screen size. The Radeon mode is tested at 1024×768; other sizes are experimental. |
 | `--rom PATH` / `--no-rom` | `vm/roms/radeon9700.rom` if present | Radeon option ROM. |
