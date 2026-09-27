@@ -28,17 +28,21 @@ Combo Update (PPC)"). That's the version everything is tested on.
 ## 2. Get the code and build
 
 ```bash
-git clone --recursive https://github.com/linuxkid473/ppcosxkvm.git
+git clone https://github.com/linuxkid473/ppcosxkvm.git
 cd ppcosxkvm
 ./ppcosx setup
 ```
+
+Don't use `git clone --recursive`. It would also download QEMU's own nested
+submodules (EDK2, OpenSSL and more, several GB) that this project doesn't
+need. `setup` fetches just the QEMU fork.
 
 `setup`:
 
 1. checks that this is a Mac with the Command Line Tools and Homebrew,
 2. `brew install`s `ninja pkgconf glib pixman libslirp` (only the missing ones),
-3. fetches the QEMU fork into `qemu/` (a shallow git submodule) if you
-   cloned without `--recursive`,
+3. fetches the QEMU fork into `qemu/` (a shallow git submodule, several
+   hundred MB),
 4. configures and builds `qemu-system-ppc` and `qemu-img` into `qemu/build/`.
 
 The first build takes 5–10 minutes. Running `setup` again later is safe; it

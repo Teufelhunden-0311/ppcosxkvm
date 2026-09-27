@@ -10,8 +10,8 @@ Command Line Tools install in the dialog, then run `./ppcosx setup` again.
 **`Homebrew is required`.** Install it from <https://brew.sh>, open a *new*
 terminal window (so `brew` is on your `PATH`), and re-run setup.
 
-**`qemu/ is empty`.** You cloned without `--recursive` and the submodule
-fetch failed. Check your network, then run
+**`qemu/ is empty` / `could not fetch the qemu submodule`.** Fetching the
+QEMU fork failed. Check your network, then run
 `git submodule update --init --depth 1 qemu` and `./ppcosx setup`.
 
 **configure or the build fails.** Read the log the error names

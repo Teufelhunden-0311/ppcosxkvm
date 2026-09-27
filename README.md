@@ -28,7 +28,7 @@ Mac OS X Tiger (PowerPC) install DVD image or an already installed PowerPC
 OS X disk.
 
 ```bash
-git clone --recursive https://github.com/linuxkid473/ppcosxkvm.git
+git clone https://github.com/linuxkid473/ppcosxkvm.git
 cd ppcosxkvm
 ./ppcosx setup
 ```

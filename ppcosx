@@ -147,7 +147,7 @@ cmd_setup() {
         git -C "$REPO" submodule update --init --depth 1 qemu \
             || die "could not fetch the qemu submodule (network?)"
     fi
-    [ -f "$QEMU_DIR/configure" ] || die "qemu/ is empty. Clone with: git clone --recursive <repo url>"
+    [ -f "$QEMU_DIR/configure" ] || die "qemu/ is empty; run: git submodule update --init --depth 1 qemu"
     ok "qemu/ at $(git -C "$QEMU_DIR" rev-parse --short HEAD 2>/dev/null || echo '?')"
 
     say "Building QEMU (qemu-system-ppc only; this takes a few minutes)"
