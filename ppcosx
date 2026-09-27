@@ -1,0 +1,553 @@
+#!/bin/bash
+# ppcosx - run PowerPC Mac OS X (Tiger) on Apple Silicon with an emulated
+# ATI Radeon 9700 PRO whose 3D engine is translated to Metal.
+#
+#   ./ppcosx help        for the command list
+#   docs/                for the long version
+#
+# Written for the bash 3.2 that ships with macOS: no associative arrays,
+# no ${var,,}, no mapfile.
+set -u
+
+REPO=$(cd "$(dirname "$0")" && pwd -P)
+VM_DIR="${PPCOSX_VM_DIR:-$REPO/vm}"
+QEMU_DIR="$REPO/qemu"
+QEMU_BUILD="$QEMU_DIR/build"
+QEMU="${PPCOSX_QEMU:-$QEMU_BUILD/qemu-system-ppc}"
+QEMU_IMG_BUILT="$QEMU_BUILD/qemu-img"
+FW_RADEON="$REPO/firmware/radeon"
+FW_VGA="$REPO/firmware/vga"
+DISK_DEFAULT="$VM_DIR/macosx.qcow2"
+ROM_DEFAULT="$VM_DIR/roms/radeon9700.rom"
+RADEON_SLOT=e         # PCI slot of the Radeon; names its device-tree node
+BREW_DEPS="ninja pkgconf glib pixman libslirp"
+
+# ---------------------------------------------------------------- output ---
+if [ -t 1 ]; then
+    B=$'\033[1m'; R=$'\033[31m'; G=$'\033[32m'; Y=$'\033[33m'; D=$'\033[2m'; N=$'\033[0m'
+else
+    B=; R=; G=; Y=; D=; N=
+fi
+say()  { printf '%s==>%s %s\n' "$B" "$N" "$*"; }
+ok()   { printf '  %s✓%s %s\n' "$G" "$N" "$*"; }
+warn() { printf '  %s!%s %s\n' "$Y" "$N" "$*"; }
+bad()  { printf '  %s✗%s %s\n' "$R" "$N" "$*"; }
+die()  { printf '%serror:%s %s\n' "$R" "$N" "$*" >&2; exit 1; }
+hint() { printf '    %s%s%s\n' "$D" "$*" "$N"; }
+
+qemu_img() {
+    if [ -x "$QEMU_IMG_BUILT" ]; then "$QEMU_IMG_BUILT" "$@"
+    elif command -v qemu-img >/dev/null 2>&1; then qemu-img "$@"
+    else die "qemu-img not found - run ./ppcosx setup first"; fi
+}
+
+need_qemu() {
+    [ -x "$QEMU" ] || die "QEMU is not built yet. Run:  ./ppcosx setup"
+}
+
+abspath() {
+    case "$1" in /*) printf '%s\n' "$1" ;; *) printf '%s/%s\n' "$(pwd -P)" "$1" ;; esac
+}
+
+human_size() {   # bytes -> "20 GB"
+    awk -v b="$1" 'BEGIN { split("B KB MB GB TB", u); i = 1;
+        while (b >= 1024 && i < 5) { b /= 1024; i++ } printf "%.0f %s\n", b, u[i] }'
+}
+
+disk_size() {    # virtual size in bytes
+    qemu_img info --output=json "$1" 2>/dev/null |
+        /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin)["virtual-size"])'
+}
+
+port_free() { ! lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
+
+# ------------------------------------------------------------------ help ---
+usage() {
+    cat <<EOF
+${B}ppcosx${N} - PowerPC Mac OS X (Tiger) on Apple Silicon, with an emulated
+ATI Radeon 9700 PRO (Quartz Extreme, Core Image and OpenGL via Metal).
+
+${B}First time${N}
+  ./ppcosx setup                 install build tools and build QEMU (~10 min)
+  ./ppcosx install <tiger.iso>   install Mac OS X from a DVD image (.iso .cdr .dmg .toast)
+    or
+  ./ppcosx import <disk>         use an existing PowerPC OS X disk
+                                 (.qcow2 .vmdk .vdi .vhd .img .utm bundle)
+  ./ppcosx rom <file.rom>        (optional) your Mac Radeon 9700 PRO ROM
+
+${B}Every day${N}
+  ./ppcosx run                   boot with the Radeon 9700 (3D acceleration)
+  ./ppcosx run --vga             boot with a plain framebuffer (safe mode)
+  ./ppcosx doctor                check that everything is in place
+
+${B}Disks${N}
+  ./ppcosx new-disk [size]       create an empty disk (default 40G)
+  ./ppcosx snapshot list|save|restore|delete [name]
+                                 disk snapshots (VM must be shut down)
+
+${B}run options${N}
+  --disk PATH      disk image to boot        (default: vm/macosx.qcow2)
+  --ram MB         guest memory, 256-2048    (default: 1024)
+  --vram MB        Radeon video memory 64/128/256 (default: 128)
+  --res WxH        screen size               (default: 1024x768)
+  --rom PATH       Radeon ROM to use         (default: vm/roms/radeon9700.rom if present)
+  --cd PATH        also attach a CD/DVD image
+  --verbose        verbose (text) boot instead of the grey Apple
+  --snapshot       throw away all disk writes when the VM quits
+  --ssh-port N     forward host 127.0.0.1:N to guest port 22
+  --monitor        QEMU monitor on 127.0.0.1:4444 (HMP) and :4445 (QMP)
+  --trace-gpu      log every GPU register access to vm/gpu-trace.log (slow)
+  -- ARGS...       pass the remaining arguments straight to QEMU
+
+Files live in ${VM_DIR/#$REPO\//}/ (override with PPCOSX_VM_DIR). Docs: docs/README.md
+EOF
+}
+
+# ----------------------------------------------------------------- setup ---
+cmd_setup() {
+    local jobs
+    say "Checking this Mac"
+    [ "$(uname -s)" = Darwin ] || die "ppcosx runs on macOS only"
+    if [ "$(uname -m)" != arm64 ]; then
+        warn "this is not an Apple Silicon Mac ($(uname -m)); it may work but is untested"
+    else
+        ok "Apple Silicon ($(sysctl -n machdep.cpu.brand_string 2>/dev/null))"
+    fi
+    ok "macOS $(sw_vers -productVersion)"
+
+    if ! xcode-select -p >/dev/null 2>&1; then
+        warn "Xcode Command Line Tools are missing; starting the installer"
+        xcode-select --install 2>/dev/null || true
+        die "finish the Command Line Tools install, then run ./ppcosx setup again"
+    fi
+    ok "Command Line Tools ($(xcode-select -p))"
+
+    if ! command -v brew >/dev/null 2>&1; then
+        for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+            [ -x "$b" ] && eval "$("$b" shellenv)" && break
+        done
+    fi
+    command -v brew >/dev/null 2>&1 || die "Homebrew is required: https://brew.sh
+    Install it, open a new terminal, and run ./ppcosx setup again."
+    ok "Homebrew ($(brew --prefix))"
+
+    local missing=
+    for p in $BREW_DEPS; do
+        brew list --formula "$p" >/dev/null 2>&1 || missing="$missing $p"
+    done
+    if [ -n "$missing" ]; then
+        say "Installing build dependencies:$missing"
+        # shellcheck disable=SC2086
+        brew install $missing || die "brew install failed"
+    fi
+    ok "build dependencies ($BREW_DEPS)"
+
+    say "Fetching the QEMU source"
+    if [ -d "$REPO/.git" ]; then
+        git -C "$REPO" submodule update --init --depth 1 qemu \
+            || die "could not fetch the qemu submodule (network?)"
+    fi
+    [ -f "$QEMU_DIR/configure" ] || die "qemu/ is empty. Clone with: git clone --recursive <repo url>"
+    ok "qemu/ at $(git -C "$QEMU_DIR" rev-parse --short HEAD 2>/dev/null || echo '?')"
+
+    say "Building QEMU (qemu-system-ppc only; this takes a few minutes)"
+    mkdir -p "$QEMU_BUILD"
+    if [ ! -f "$QEMU_BUILD/build.ninja" ]; then
+        (cd "$QEMU_BUILD" && ../configure \
+            --target-list=ppc-softmmu --disable-docs --disable-sdl \
+            --disable-werror -Doptimization=2) \
+            > "$QEMU_BUILD/ppcosx-configure.log" 2>&1 \
+            || { tail -30 "$QEMU_BUILD/ppcosx-configure.log"
+                 die "configure failed; full log: qemu/build/ppcosx-configure.log"; }
+        ok "configured"
+    fi
+    jobs=$(sysctl -n hw.ncpu 2>/dev/null || echo 8)
+    if ! ninja -C "$QEMU_BUILD" -j "$jobs" qemu-system-ppc qemu-img \
+            > "$QEMU_BUILD/ppcosx-build.log" 2>&1; then
+        grep -E 'error|FAILED' "$QEMU_BUILD/ppcosx-build.log" | head -20
+        die "build failed; full log: qemu/build/ppcosx-build.log"
+    fi
+    ok "built $(basename "$QEMU")"
+
+    mkdir -p "$VM_DIR/roms"
+    echo
+    say "Setup complete. Next:"
+    if [ -f "$DISK_DEFAULT" ]; then
+        hint "./ppcosx run"
+    else
+        hint "./ppcosx install /path/to/MacOSX-Tiger.iso     (fresh install)"
+        hint "./ppcosx import  /path/to/existing-disk.vmdk   (existing PowerPC OS X disk)"
+    fi
+}
+
+# ---------------------------------------------------------------- doctor ---
+cmd_doctor() {
+    local fail=0 v
+    say "Host"
+    [ "$(uname -m)" = arm64 ] && ok "Apple Silicon" || warn "not Apple Silicon ($(uname -m))"
+    ok "macOS $(sw_vers -productVersion)"
+    xcode-select -p >/dev/null 2>&1 && ok "Command Line Tools" || { bad "Command Line Tools missing"; hint "xcode-select --install"; fail=1; }
+    if command -v brew >/dev/null 2>&1; then
+        ok "Homebrew"
+        for p in $BREW_DEPS; do
+            brew list --formula "$p" >/dev/null 2>&1 || { bad "brew package $p missing"; fail=1; }
+        done
+    else
+        bad "Homebrew missing (https://brew.sh)"; fail=1
+    fi
+
+    say "Emulator"
+    if [ -x "$QEMU" ]; then
+        v=$("$QEMU" --version 2>/dev/null | head -1)
+        ok "$v"
+        "$QEMU" -device help 2>/dev/null | grep -q ati-radeon-9700 \
+            && ok "ati-radeon-9700 device present" \
+            || { bad "this QEMU has no ati-radeon-9700 device"; fail=1; }
+    else
+        bad "QEMU not built"; hint "./ppcosx setup"; fail=1
+    fi
+    for f in "$FW_RADEON/openbios-ppc" "$FW_RADEON/ppc-ndrvloader" "$FW_RADEON/qemu_vga_hwc.ndrv" \
+             "$FW_VGA/openbios-ppc" "$FW_VGA/ppc-ndrvloader"; do
+        [ -f "$f" ] || { bad "missing ${f#$REPO/}"; fail=1; }
+    done
+    (cd "$REPO/firmware" && shasum -c SHA1SUMS >/dev/null 2>&1) \
+        && ok "firmware checksums" || { bad "firmware checksums do not match firmware/SHA1SUMS"; fail=1; }
+
+    say "Your files ($VM_DIR)"
+    if [ -f "$DISK_DEFAULT" ]; then
+        ok "disk ${DISK_DEFAULT#$REPO/} ($(human_size "$(disk_size "$DISK_DEFAULT")"))"
+    else
+        warn "no disk yet"; hint "./ppcosx install <iso>   or   ./ppcosx import <disk>"
+    fi
+    if [ -f "$ROM_DEFAULT" ]; then
+        rom_check "$ROM_DEFAULT" >/dev/null && ok "Radeon ROM $(rom_check "$ROM_DEFAULT")" \
+            || { bad "vm/roms/radeon9700.rom is not a Mac Radeon 9700 ROM"; fail=1; }
+    else
+        ok "no Radeon ROM (optional)"
+    fi
+    echo
+    [ $fail = 0 ] && say "${G}All good.${N}" || say "${R}Some checks failed${N} - see above."
+    return $fail
+}
+
+# ------------------------------------------------------------------- rom ---
+# Print "vendor:device (Open Firmware)" for a Mac ATI ROM; fail otherwise.
+rom_check() {
+    /usr/bin/python3 - "$1" <<'PY'
+import struct, sys
+d = open(sys.argv[1], 'rb').read()
+if len(d) < 0x40 or d[:2] != b'\x55\xaa':
+    sys.exit("not a PCI option ROM (no 55 AA signature)")
+p = struct.unpack('<H', d[0x18:0x1a])[0]
+if d[p:p+4] != b'PCIR':
+    sys.exit("no PCI data structure")
+ven, dev = struct.unpack('<HH', d[p+4:p+8])
+code = d[p+0x14]
+if ven != 0x1002:
+    sys.exit("vendor %04x is not ATI" % ven)
+if dev != 0x4e44:
+    sys.exit("device %04x:%04x is not a Radeon 9700 PRO (1002:4e44)" % (ven, dev))
+if code != 1:
+    sys.exit("this is a PC ROM (code type %d); a Mac (Open Firmware) ROM is needed" % code)
+print("%04x:%04x, Open Firmware, %d KB" % (ven, dev, len(d) // 1024))
+PY
+}
+
+cmd_rom() {
+    [ $# -ge 1 ] || die "usage: ./ppcosx rom <file.rom>   (or: ./ppcosx rom --remove)"
+    if [ "$1" = --remove ]; then
+        rm -f "$ROM_DEFAULT"; ok "ROM removed; the Radeon runs without one"; return
+    fi
+    [ -f "$1" ] || die "no such file: $1"
+    local info
+    info=$(rom_check "$1" 2>&1) || die "$1: $info"
+    mkdir -p "$VM_DIR/roms"
+    cp "$1" "$ROM_DEFAULT"
+    ok "installed ROM ($info) as ${ROM_DEFAULT#$REPO/}"
+}
+
+# -------------------------------------------------------------- new-disk ---
+cmd_new_disk() {
+    local size="${1:-40G}" disk="${2:-$DISK_DEFAULT}"
+    [ -e "$disk" ] && die "$disk already exists (delete it first to start over)"
+    mkdir -p "$(dirname "$disk")"
+    qemu_img create -q -f qcow2 "$disk" "$size" || die "qemu-img create failed"
+    ok "created empty $size disk ${disk#$REPO/}"
+}
+
+# ---------------------------------------------------------------- import ---
+cmd_import() {
+    local force=0 src= dst="$DISK_DEFAULT" f
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --force) force=1 ;;
+            --as) shift; dst=$(abspath "$1") ;;
+            -*) die "unknown option $1" ;;
+            *) src="$1" ;;
+        esac
+        shift
+    done
+    [ -n "$src" ] || die "usage: ./ppcosx import <disk image or .utm bundle> [--as out.qcow2] [--force]"
+    [ -e "$src" ] || die "no such file: $src"
+    src=$(abspath "$src")
+
+    if [ -d "$src" ]; then   # UTM bundle: take the largest disk image in Data/
+        f=$(ls -S "$src"/Data/*.qcow2 "$src"/Data/*.img 2>/dev/null | head -1)
+        [ -n "$f" ] || die "$src has no Data/*.qcow2 or Data/*.img disk"
+        say "Using the UTM disk $(basename "$f")"
+        src="$f"
+    fi
+    case "$src" in
+        *.dmg|*.iso|*.cdr|*.toast) die "$(basename "$src") looks like an installer; use: ./ppcosx install \"$src\"" ;;
+    esac
+    if [ -e "$dst" ] && [ $force = 0 ]; then
+        die "${dst#$REPO/} already exists. Use --force to replace it, or --as other.qcow2"
+    fi
+
+    say "Converting $(basename "$src") to ${dst#$REPO/} (your original is not modified)"
+    mkdir -p "$(dirname "$dst")"
+    qemu_img convert -p -O qcow2 "$src" "$dst.part" || { rm -f "$dst.part"; die "conversion failed"; }
+    mv -f "$dst.part" "$dst"
+    ok "imported"
+    hint "Boot it:  ./ppcosx run$( [ "$dst" != "$DISK_DEFAULT" ] && printf ' --disk %s' "$dst")"
+}
+
+# ------------------------------------------------------------- snapshots ---
+cmd_snapshot() {
+    local disk="$DISK_DEFAULT" action="${1:-list}"
+    [ $# -gt 0 ] && shift
+    [ -f "$disk" ] || die "no disk at ${disk#$REPO/}"
+    if pgrep -f "qemu-system-ppc.*$(basename "$disk")" >/dev/null 2>&1; then
+        die "the VM is running; shut it down first"
+    fi
+    case "$action" in
+        list)    qemu_img snapshot -l "$disk" ;;
+        save)    [ $# = 1 ] || die "usage: ./ppcosx snapshot save <name>"
+                 qemu_img snapshot -c "$1" "$disk" && ok "saved snapshot '$1'" ;;
+        restore) [ $# = 1 ] || die "usage: ./ppcosx snapshot restore <name>"
+                 qemu_img snapshot -a "$1" "$disk" && ok "disk restored to '$1'" ;;
+        delete)  [ $# = 1 ] || die "usage: ./ppcosx snapshot delete <name>"
+                 qemu_img snapshot -d "$1" "$disk" && ok "deleted snapshot '$1'" ;;
+        *) die "usage: ./ppcosx snapshot list|save|restore|delete [name]" ;;
+    esac
+}
+
+# ------------------------------------------------------------------- run ---
+# Shared by run and install.  Sets the global array QARGS.
+build_common() {   # $1 = disk, $2 = "cd" when booting from CD
+    local hdboot=,bootindex=0
+    [ "${2:-}" = cd ] && hdboot=
+    QARGS=(-nodefaults -vga none
+        -machine mac99,via=pmu -accel tcg,tb-size=256
+        -smp cpus=1,sockets=1,cores=1,threads=1 -m "$RAM"
+        -display cocoa -audio coreaudio
+        -drive "if=none,media=disk,id=hd,file.filename=$1,discard=unmap,detect-zeroes=unmap"
+        -device "ide-hd,bus=ide.0,unit=0,drive=hd$hdboot")
+    [ "$SNAPSHOT" = 1 ] && QARGS+=(-snapshot)
+    if [ "$MONITOR" = 1 ]; then
+        port_free 4444 || die "port 4444 is in use (another VM running?)"
+        QARGS+=(-monitor tcp:127.0.0.1:4444,server,nowait -qmp tcp:127.0.0.1:4445,server,nowait)
+    fi
+}
+
+# Added after the display device, so the display keeps its PCI slot.
+add_net() {
+    local net="user,id=net0,ipv6=off"
+    if [ -n "$SSH_PORT" ]; then
+        port_free "$SSH_PORT" || die "port $SSH_PORT is in use"
+        net="$net,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22"
+    fi
+    QARGS+=(-netdev "$net" -device sungem,netdev=net0)
+}
+
+parse_run_opts() {
+    DISK="$DISK_DEFAULT"; RAM=1024; VRAM=128; RES=1024x768; ROM=; CD=
+    VERBOSE=0; SNAPSHOT=0; SSH_PORT=; MONITOR=0; TRACE=0; MODE=radeon
+    EXTRA=()
+    [ -f "$ROM_DEFAULT" ] && ROM="$ROM_DEFAULT"
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --disk) DISK=$(abspath "$2"); shift ;;
+            --ram) RAM="$2"; shift ;;
+            --vram) VRAM="$2"; shift ;;
+            --res) RES="$2"; shift ;;
+            --rom) ROM=$(abspath "$2"); shift ;;
+            --no-rom) ROM= ;;
+            --cd) CD=$(abspath "$2"); shift ;;
+            --vga) MODE=vga ;;
+            --verbose|-v) VERBOSE=1 ;;
+            --snapshot) SNAPSHOT=1 ;;
+            --ssh-port) SSH_PORT="$2"; shift ;;
+            --monitor) MONITOR=1 ;;
+            --trace-gpu) TRACE=1 ;;
+            --) shift; EXTRA=("$@"); break ;;
+            -h|--help) usage; exit 0 ;;
+            *) die "unknown option: $1 (see ./ppcosx help)" ;;
+        esac
+        shift
+    done
+    case "$RAM" in ''|*[!0-9]*) die "--ram takes a number of MB" ;; esac
+    [ "$RAM" -ge 256 ] && [ "$RAM" -le 2048 ] || die "--ram must be 256-2048 (mac99 limit is 2 GB)"
+    case "$VRAM" in 64|128|256) ;; *) die "--vram must be 64, 128 or 256" ;; esac
+    case "$RES" in [0-9]*x[0-9]*) ;; *) die "--res looks like 1024x768" ;; esac
+    [ -z "$CD" ] || [ -f "$CD" ] || die "no such CD image: $CD"
+    if [ -n "$ROM" ]; then
+        [ -f "$ROM" ] || die "no such ROM: $ROM"
+        local info; info=$(rom_check "$ROM" 2>&1) || die "$ROM: $info"
+    fi
+}
+
+cmd_run() {
+    need_qemu
+    parse_run_opts "$@"
+    [ -f "$DISK" ] || die "no disk at ${DISK#$REPO/}
+    Install Mac OS X first:  ./ppcosx install <tiger.iso>
+    or bring a disk:         ./ppcosx import <disk.vmdk|.qcow2|.utm>"
+    if pgrep -f "qemu-system-ppc.*$(basename "$DISK")" >/dev/null 2>&1 && [ "$SNAPSHOT" = 0 ]; then
+        die "a VM is already running on $(basename "$DISK") (use --snapshot to boot a throwaway copy)"
+    fi
+
+    build_common "$DISK"
+    [ "$VERBOSE" = 1 ] && QARGS+=(-prom-env 'boot-args=-v')
+    QARGS+=(-usb -device usb-mouse,bus=usb-bus.0 -device usb-kbd,bus=usb-bus.0)
+    if [ -n "$CD" ]; then
+        QARGS+=(-drive "if=none,media=cdrom,id=cd,readonly=on,file=$CD"
+                -device ide-cd,bus=ide.0,unit=1,drive=cd)
+    fi
+
+    if [ "$MODE" = vga ]; then
+        # UTM's "PowerPC G4" preset: QEMU VGA with the QEMU NDRV.  No 3D.
+        QARGS=(-L "$FW_VGA" -L "$QEMU_DIR/pc-bios" "${QARGS[@]}"
+            -device loader,addr=0x4000000,file="$FW_VGA/ppc-ndrvloader"
+            -prom-env 'boot-command=init-program go'
+            -device VGA,edid=on -g "${RES}x32"
+            -device ich9-usb-ehci1,id=usb-controller-0
+            -device ich9-usb-uhci1,masterbus=usb-controller-0.0,firstport=0,multifunction=on
+            -device ich9-usb-uhci2,masterbus=usb-controller-0.0,firstport=2,multifunction=on
+            -device ich9-usb-uhci3,masterbus=usb-controller-0.0,firstport=4,multifunction=on
+            -device virtio-tablet-pci)
+        say "Booting ${DISK#$REPO/} with the plain VGA framebuffer (no 3D)"
+    else
+        # The Radeon is pinned to PCI slot $RADEON_SLOT so the node path below
+        # is always right: /pci@f2000000/QEMU,VGA@e.
+        # The firmware's display table is patched to 1002:4E44, so OpenBIOS
+        # builds /pci@f2000000/QEMU,VGA@e for the Radeon and the QEMU NDRV
+        # (plus hardware cursor) drives the framebuffer; Tiger's
+        # ATIRadeon9700.kext then attaches for 2D/3D.  The node keeps
+        # name/compatible "QEMU,VGA" (the NDRV matches on them) and gets the
+        # 9700 PRO FCode's identity, which System Profiler reports as
+        # "ATI Radeon 9700 Pro", plus the VRAM size.
+        local vram_hex boot
+        vram_hex=$(printf %x $((VRAM * 1048576)))
+        boot="\" /pci@f2000000/QEMU,VGA@$RADEON_SLOT\" ['] find-device catch 0= if"
+        boot="$boot h# $vram_hex encode-int \" VRAM,totalsize\" property"
+        boot="$boot \" ATY,R300\" encode-string \" model\" property"
+        boot="$boot \" 113-A06500-124\" encode-string \" ATY,Rom#\" property"
+        boot="$boot \" 109-A06501-00\" encode-string \" ATY,Card#\" property"
+        boot="$boot \" 1.88\" encode-string \" ATY,Fcode\" property"
+        boot="$boot device-end then init-program go"
+
+        local dev="ati-radeon-9700,addr=$RADEON_SLOT.0,vgamem_mb=$VRAM"
+        if [ -n "$ROM" ]; then dev="$dev,romfile=$ROM,biosrom=$ROM"
+        else dev="$dev,romfile="; fi
+
+        export QEMU_PPC_NDRV="$FW_RADEON/qemu_vga_hwc.ndrv"
+        QARGS=(-L "$FW_RADEON" -L "$QEMU_DIR/pc-bios" "${QARGS[@]}"
+            -device loader,addr=0x4000000,file="$FW_RADEON/ppc-ndrvloader"
+            -prom-env "boot-command=$boot"
+            -global uni-north-pci.agp-capable=on
+            -device "$dev" -g "${RES}x32"
+            -device usb-tablet,bus=usb-bus.0
+            -D "$VM_DIR/gpu-trace.log")
+        if [ "$TRACE" = 1 ]; then QARGS+=(-trace 'ppc_mac_gpu_*')
+        else QARGS+=(-trace ppc_mac_gpu_realize); fi
+        say "Booting ${DISK#$REPO/} with the ATI Radeon 9700 PRO ($VRAM MB${ROM:+, ROM $(basename "$ROM")})"
+    fi
+    add_net
+    hint "Release the mouse: Ctrl+Option+G.  Quit: shut down Mac OS X, or Cmd+Q the QEMU window."
+    [ "$SNAPSHOT" = 1 ] && hint "--snapshot: nothing you do in this session is saved to the disk."
+
+    mkdir -p "$VM_DIR"
+    exec "$QEMU" "${QARGS[@]}" ${EXTRA[@]+"${EXTRA[@]}"}
+}
+
+# --------------------------------------------------------------- install ---
+cmd_install() {
+    need_qemu
+    local iso= size=40G args=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --size) size="$2"; shift ;;
+            --disk|--ram|--res) args+=("$1" "$2"); shift ;;
+            --verbose|-v) args+=("$1") ;;
+            -*) die "unknown option $1" ;;
+            *) iso=$(abspath "$1") ;;
+        esac
+        shift
+    done
+    [ -n "$iso" ] || die "usage: ./ppcosx install <Mac OS X install DVD: .iso .cdr .dmg .toast> [--size 40G]"
+    [ -f "$iso" ] || die "no such file: $iso"
+
+    case "$iso" in
+        *.dmg)   # Compressed UDIF images need converting to a raw CD image first.
+            local cdr="$VM_DIR/installer-$(basename "${iso%.*}").cdr"
+            if [ ! -f "$cdr" ]; then
+                say "Converting $(basename "$iso") to a raw DVD image (one time)"
+                mkdir -p "$VM_DIR"
+                hdiutil convert "$iso" -format UDTO -o "${cdr%.cdr}" -quiet \
+                    || die "hdiutil could not convert $iso"
+            fi
+            iso="$cdr" ;;
+    esac
+
+    parse_run_opts ${args[@]+"${args[@]}"}
+    if [ ! -f "$DISK" ]; then
+        cmd_new_disk "$size" "$DISK"
+    else
+        warn "installing onto the existing disk ${DISK#$REPO/}"
+    fi
+
+    # Plain OpenBIOS CD boot (-boot d) with UTM's firmware and QEMU VGA:
+    # the installer does not need the Radeon, and this is the setup the
+    # Tiger installer is known to work with.  -no-reboot turns the
+    # installer's final restart into a clean exit.
+    build_common "$DISK" cd
+    QARGS=(-L "$FW_VGA" -L "$QEMU_DIR/pc-bios" "${QARGS[@]}"
+        -device VGA,edid=on -g "${RES}x32"
+        -drive "if=none,media=cdrom,id=cd,readonly=on,file=$iso"
+        -device ide-cd,bus=ide.1,unit=0,drive=cd,bootindex=0
+        -boot d -no-reboot
+        -usb -device usb-mouse,bus=usb-bus.0 -device usb-kbd,bus=usb-bus.0)
+    [ "$VERBOSE" = 1 ] && QARGS+=(-prom-env 'boot-args=-v')
+    add_net
+
+    cat <<EOF
+${B}Installing Mac OS X from $(basename "$iso") onto ${DISK#$REPO/}${N}
+
+  1. Pick a language. When the installer opens, choose ${B}Utilities > Disk Utility${N}.
+  2. Select the QEMU hard disk, ${B}Erase${N} it as "Mac OS Extended (Journaled)",
+     then quit Disk Utility.
+  3. Continue the installer and pick the new volume. The install takes
+     roughly 30-60 minutes; "Customize" and unticking printer drivers and
+     extra languages makes it much faster.
+  4. When it restarts, this window closes. Then boot it with:  ${B}./ppcosx run${N}
+
+EOF
+    exec "$QEMU" "${QARGS[@]}"
+}
+
+# ------------------------------------------------------------------ main ---
+cmd="${1:-help}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
+    setup)            cmd_setup "$@" ;;
+    doctor|check)     cmd_doctor "$@" ;;
+    run|start|boot)   cmd_run "$@" ;;
+    install)          cmd_install "$@" ;;
+    import)           cmd_import "$@" ;;
+    rom)              cmd_rom "$@" ;;
+    new-disk)         cmd_new_disk "$@" ;;
+    snapshot|snap)    cmd_snapshot "$@" ;;
+    help|-h|--help)   usage ;;
+    *) printf 'unknown command: %s\n\n' "$cmd" >&2; usage >&2; exit 2 ;;
+esac

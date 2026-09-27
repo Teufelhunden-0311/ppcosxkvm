@@ -1,0 +1,5 @@
+[submodule "qemu"]
+	path = qemu
+	url = https://github.com/linuxkid473/poweremu-qemu.git
+	branch = r300
+	shallow = true

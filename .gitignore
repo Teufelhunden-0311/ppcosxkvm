@@ -1,0 +1,20 @@
+# Your data: disks, ROMs, logs, installer images
+/vm/
+*.qcow2
+*.vmdk
+*.vdi
+*.img
+*.iso
+*.cdr
+*.dmg
+*.toast
+*.rom
+!/firmware/**
+
+# Local-only material (reference docs, Apple/ATI binaries, build venv)
+/assets/
+/ref/
+/.buildenv/
+*.log
+.DS_Store
+__pycache__/
