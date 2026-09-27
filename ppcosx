@@ -34,6 +34,10 @@ FW_VGA="$REPO/firmware/vga"
 DISK_DEFAULT="$VM_DIR/macosx.qcow2"
 ROM_DEFAULT="$VM_DIR/roms/radeon9700.rom"
 CPU_MHZ_DEFAULT=2000  # CPU speed Mac OS X is told (reporting only; QEMU says 900)
+# Model Mac OS X is told (hw.model).  A G4 PowerBook, because apps' minimum
+# requirement checks (Aperture) accept a G4 only in a PowerBook; the
+# firmware's own "PowerMac3,1" would need a G5.  "default" keeps that.
+MODEL_DEFAULT=PowerBook5,8
 RADEON_SLOT=e         # PCI slot of the Radeon; names its device-tree node
 BREW_DEPS="ninja pkgconf glib pixman libslirp"
 
@@ -114,6 +118,7 @@ ${B}Run options${N} (for "ppcosx", "ppcosx run" and "ppcosx install")
   --disk PATH      disk image to boot        (default: vm/macosx.qcow2)
   --ram MB         guest memory, 256-2048    (default: 1024)
   --cpu-mhz N      CPU speed Mac OS X sees   (default: $CPU_MHZ_DEFAULT; reporting only)
+  --model NAME     Mac model Mac OS X sees   (default: $MODEL_DEFAULT; "default" = PowerMac3,1)
   --vram MB        Radeon video memory 64/128/256 (default: 128)
   --res WxH        screen size               (default: 1024x768)
   --rom PATH       Radeon ROM to use         (default: vm/roms/radeon9700.rom if present)
@@ -424,6 +429,20 @@ build_common() {   # $1 = disk, $2 = "cd" when booting from CD
     fi
 }
 
+# Forth for the boot command: with --model, make NAME the first entry of
+# the root "compatible" list, which is where Mac OS X's hw.model comes from
+# (apps such as Aperture check it).  The rest keeps what the platform
+# drivers match on.  The machine itself doesn't change.
+model_forth() {
+    [ -n "$MODEL" ] || return 0
+    printf '%s ' "\" /\" find-device" \
+        "\" $MODEL\" encode-string" \
+        "\" MacRISC\" encode-string encode+" \
+        "\" MacRISC2\" encode-string encode+" \
+        "\" Power Macintosh\" encode-string encode+" \
+        "\" compatible\" property device-end"
+}
+
 # Added after the display device, so the display keeps its PCI slot.
 add_net() {
     local net="user,id=net0,ipv6=off"
@@ -436,7 +455,7 @@ add_net() {
 
 parse_run_opts() {
     DISK="$DISK_DEFAULT"; RAM=1024; VRAM=128; RES=1024x768; ROM=; CD=
-    CPU_MHZ="${PPCOSX_CPU_MHZ:-$CPU_MHZ_DEFAULT}"
+    CPU_MHZ="${PPCOSX_CPU_MHZ:-$CPU_MHZ_DEFAULT}"; MODEL="${PPCOSX_MODEL:-$MODEL_DEFAULT}"
     VERBOSE=0; SNAPSHOT=0; SSH_PORT=; MONITOR=0; TRACE=0; MODE=radeon
     EXTRA=()
     [ -f "$ROM_DEFAULT" ] && ROM="$ROM_DEFAULT"
@@ -445,6 +464,7 @@ parse_run_opts() {
             --disk) DISK=$(abspath "$2"); shift ;;
             --ram) RAM="$2"; shift ;;
             --cpu-mhz) CPU_MHZ="$2"; shift ;;
+            --model) MODEL="$2"; shift ;;
             --vram) VRAM="$2"; shift ;;
             --res) RES="$2"; shift ;;
             --rom) ROM=$(abspath "$2"); shift ;;
@@ -468,6 +488,10 @@ parse_run_opts() {
     [ "$RAM" -ge 256 ] && [ "$RAM" -le 2048 ] || die "--ram must be 256-2048 (mac99 limit is 2 GB)"
     case "$VRAM" in 64|128|256) ;; *) die "--vram must be 64, 128 or 256" ;; esac
     case "$CPU_MHZ" in ''|*[!0-9]*) die "--cpu-mhz takes a number of MHz" ;; esac
+    case "$MODEL" in
+        default|none|'') MODEL= ;;
+        *[!A-Za-z0-9,._-]*) die "--model takes a Mac model name like PowerBook5,8" ;;
+    esac
     [ "$CPU_MHZ" -ge 100 ] && [ "$CPU_MHZ" -le 4000 ] || die "--cpu-mhz must be 100-4000"
     case "$RES" in [0-9]*x[0-9]*) ;; *) die "--res looks like 1024x768" ;; esac
     [ -z "$CD" ] || [ -f "$CD" ] || die "no such DVD image: $CD"
@@ -500,7 +524,7 @@ cmd_run() {
         # UTM's "PowerPC G4" preset: QEMU VGA with the QEMU NDRV.  No 3D.
         QARGS=(-L "$FW_VGA" -L "$QEMU_DIR/pc-bios" "${QARGS[@]}"
             -device loader,addr=0x4000000,file="$FW_VGA/ppc-ndrvloader"
-            -prom-env 'boot-command=init-program go'
+            -prom-env "boot-command=$(model_forth)init-program go"
             -device VGA,edid=on -g "${RES}x32"
             -device ich9-usb-ehci1,id=usb-controller-0
             -device ich9-usb-uhci1,masterbus=usb-controller-0.0,firstport=0,multifunction=on
@@ -520,7 +544,7 @@ cmd_run() {
         # "ATI Radeon 9700 Pro", plus the VRAM size.
         local vram_hex boot
         vram_hex=$(printf %x $((VRAM * 1048576)))
-        boot="\" /pci@f2000000/QEMU,VGA@$RADEON_SLOT\" ['] find-device catch 0= if"
+        boot="$(model_forth)\" /pci@f2000000/QEMU,VGA@$RADEON_SLOT\" ['] find-device catch 0= if"
         boot="$boot h# $vram_hex encode-int \" VRAM,totalsize\" property"
         boot="$boot \" ATY,R300\" encode-string \" model\" property"
         boot="$boot \" 113-A06500-124\" encode-string \" ATY,Rom#\" property"

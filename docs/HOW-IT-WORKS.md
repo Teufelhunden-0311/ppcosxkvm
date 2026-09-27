@@ -114,6 +114,13 @@ slow.
   (`--cpu-mhz`; QEMU normally says 900 MHz) so that apps with minimum
   requirements, such as Aperture, see a capable Mac. Guest timing uses the
   separate timebase clock, so the reported figure doesn't affect behaviour.
+* **It says it's a PowerBook.** By default the machine reports itself as a
+  `PowerBook5,8` (`--model`): Mac OS X takes `hw.model` from the first
+  entry of the firmware's root `compatible` property, and Aperture 1.5
+  accepts a G4 only in a machine whose model starts with "PowerBook"
+  (faster than 1.25 GHz). It checks nothing else about the hardware
+  except OpenGL's `GL_ARB_fragment_program`. `--model default` restores
+  the firmware's `PowerMac3,1`.
 * **Resolution.** The Radeon mode is tested at 1024×768. Other `--res`
   sizes are experimental.
 * **Tiling** (macro/micro tile bits) is ignored. That's consistent as long
