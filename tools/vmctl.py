@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive a running VM from the host (for scripting and testing).
 
-Start the VM with `./ppcosx run --monitor`, then:
+Start the VM with `./ppcosx run --monitor` (or `install --monitor`), then:
 
     tools/vmctl.py cmd '<HMP command>'     e.g. cmd 'info pci'
     tools/vmctl.py type 'text'             type into the guest
@@ -9,7 +9,9 @@ Start the VM with `./ppcosx run --monitor`, then:
     tools/vmctl.py shot out.png            screenshot
     tools/vmctl.py click X Y [right]       click / dclick / move / drag x0 y0 x1 y1
 
-Coordinates are guest pixels at 1024x768.
+Coordinates are guest pixels; the screen size is read from the VM.
+An installed Tiger scales tablet input about the centre by 1.1775; the
+installer DVD does not, so set VMCTL_SCALE=1 while driving the installer.
 """
 import socket, sys, time, json, os, subprocess
 
@@ -74,9 +76,29 @@ def qmp(cmds):
     s.close()
     return res
 
-W, H = 1024, 768
-SCALE = 1.1775      # Tiger's HID stack scales tablet input about the centre
+def screen_size():
+    tmp = '/tmp/vmctl-%d.ppm' % os.getpid()
+    hmp('screendump "%s"' % tmp, 0.1)
+    for _ in range(50):
+        try:
+            with open(tmp, 'rb') as f:
+                hdr = f.read(32).split()   # P6 <width> <height> 255
+            if len(hdr) >= 3:
+                os.remove(tmp)
+                return int(hdr[1]), int(hdr[2])
+        except FileNotFoundError:
+            pass
+        time.sleep(0.05)
+    sys.exit('vmctl: could not read the screen size from the VM')
+
+SIZE = None
+# An installed Tiger scales tablet input about the centre (the installer doesn't)
+SCALE = float(os.environ.get('VMCTL_SCALE', '1.1775'))
 def absev(x, y):
+    global SIZE
+    if SIZE is None:
+        SIZE = screen_size()
+    W, H = SIZE
     x = (x - W / 2) / SCALE + W / 2
     y = (y - H / 2) / SCALE + H / 2
     x = min(max(x, 0), W - 1); y = min(max(y, 0), H - 1)
@@ -119,8 +141,13 @@ def shot(path):
                    capture_output=True)
     os.remove(tmp)
 
+NARGS = {'cmd': (1, 2), 'type': (1, 1), 'key': (1, 1), 'shot': (1, 1),
+         'click': (2, 3), 'dclick': (2, 2), 'move': (2, 2), 'drag': (4, 4)}
+
 if __name__ == '__main__':
     a = sys.argv[1:]
+    if not a or a[0] not in NARGS or not NARGS[a[0]][0] <= len(a) - 1 <= NARGS[a[0]][1]:
+        sys.exit(__doc__)
     if a[0] == 'cmd': print(hmp(a[1], float(a[2]) if len(a) > 2 else 0.5))
     elif a[0] == 'type': typ(a[1])
     elif a[0] == 'key': hmp('sendkey ' + a[1])

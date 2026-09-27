@@ -356,7 +356,7 @@ build_common() {   # $1 = disk, $2 = "cd" when booting from CD
         -device "ide-hd,bus=ide.0,unit=0,drive=hd$hdboot")
     [ "$SNAPSHOT" = 1 ] && QARGS+=(-snapshot)
     if [ "$MONITOR" = 1 ]; then
-        port_free 4444 || die "port 4444 is in use (another VM running?)"
+        port_free 4444 && port_free 4445 || die "port 4444 or 4445 is in use (another VM running?)"
         QARGS+=(-monitor tcp:127.0.0.1:4444,server,nowait -qmp tcp:127.0.0.1:4445,server,nowait)
     fi
 }
@@ -436,7 +436,8 @@ cmd_run() {
             -device ich9-usb-uhci1,masterbus=usb-controller-0.0,firstport=0,multifunction=on
             -device ich9-usb-uhci2,masterbus=usb-controller-0.0,firstport=2,multifunction=on
             -device ich9-usb-uhci3,masterbus=usb-controller-0.0,firstport=4,multifunction=on
-            -device virtio-tablet-pci)
+            -device virtio-tablet-pci
+            -device usb-tablet,bus=usb-bus.0)   # absolute pointer for tools/vmctl.py
         say "Booting ${DISK#$REPO/} with the plain VGA framebuffer (no 3D)"
     else
         # The Radeon is pinned to PCI slot $RADEON_SLOT so the node path below
@@ -528,7 +529,8 @@ cmd_install() {
         -drive "if=none,media=cdrom,id=cd,readonly=on,file=$iso"
         -device ide-cd,bus=ide.1,unit=0,drive=cd,bootindex=0
         -boot d -no-reboot
-        -usb -device usb-mouse,bus=usb-bus.0 -device usb-kbd,bus=usb-bus.0)
+        -usb -device usb-mouse,bus=usb-bus.0 -device usb-kbd,bus=usb-bus.0
+        -device usb-tablet,bus=usb-bus.0)   # absolute pointer for tools/vmctl.py
     [ "$VERBOSE" = 1 ] && QARGS+=(-prom-env 'boot-args=-v')
     add_net
 
