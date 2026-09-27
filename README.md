@@ -1,111 +1,158 @@
 # ppcosxkvm
 
-**PowerPC Mac OS X Tiger on Apple Silicon, with real 3D.** A patched QEMU
-emulates a Power Mac G4 with an **ATI Radeon 9700 PRO**. Tiger's own ATI
-driver runs the emulated card, and the card's 3D engine is translated to
-Metal on the host GPU. Quartz Extreme, Core Image and OpenGL work on the
-emulated card.
+**Run Mac OS X Tiger (the PowerPC version) on your Apple Silicon Mac, with
+working 3D graphics.**
 
-```
-┌ Mac OS X 10.4 (PowerPC) ───────────────────────────┐
-│  WindowServer / OpenGL apps                        │
-│  ATIRadeon9700.kext + ATI GL driver (Apple's own)  │
-└──────────── R300 registers, command ring ──────────┘
-┌ QEMU (this repo's fork) ───────────────────────────┐
-│  ati-radeon-9700: CP/PM4, GART, R300 3D state      │
-│  vertex programs → CPU, fragment programs → MSL    │
-└──────────────────── Metal ─────────────────────────┘
-        Apple Silicon GPU
-```
+Old PowerPC Macs and their software, back on a modern Mac: the Aqua desktop
+with Quartz Extreme, Core Image and OpenGL apps, accelerated by your Mac's
+own GPU.
 
-System Profiler in the guest reports an **ATI Radeon 9700 Pro** (`ATY,R300`),
-with Quartz Extreme and Core Image both *Supported*.
+![System Profiler in the emulated Mac reporting an ATI Radeon 9700 Pro, with Quartz Extreme and Core Image supported](docs/images/system-profiler.png)
 
-## Quick start
+## What makes it different
 
-You need an Apple Silicon Mac, [Homebrew](https://brew.sh), and **your own**
-Mac OS X Tiger (PowerPC) install DVD image or an already installed PowerPC
-OS X disk. Paste this into Terminal:
+Other PowerPC emulators give Tiger a simple "dumb" screen, so everything
+graphical is drawn slowly by the emulated CPU, and Quartz Extreme and Core
+Image are switched off.
+
+ppcosxkvm emulates a real graphics card that Tiger already knows: the
+**ATI Radeon 9700 PRO**. Tiger uses Apple's own driver for it, exactly as
+on a real Power Mac G4. Everything that driver asks the card to draw is
+handed to your Mac's GPU through Metal.
+
+* ✅ **Quartz Extreme**: windows and the Dock composited by the GPU
+* ✅ **Core Image**: reported as supported, with the programmable
+  shaders it needs
+* ✅ **OpenGL apps**: e.g. Chess, with depth, anti-aliasing and textures
+* ✅ **Easy to use**: one line to install, one word to start
+
+## What you need
+
+* 💻 A Mac with **Apple Silicon** (M1 or newer)
+* 🍺 **[Homebrew](https://brew.sh)** (the installer tells you if it's missing)
+* 💿 **Mac OS X Tiger for PowerPC**, which you provide yourself. Either:
+  * a Tiger **install DVD image** (`.iso`, `.dmg`, `.cdr` or `.toast`), or
+  * a Tiger **disk you already have** from another emulator, such as UTM,
+    VMware, VirtualBox or a raw image
+* 📦 About **25 GB** of free disk space
+
+## Install
+
+Open **Terminal** and paste:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/linuxkid473/ppcosxkvm/main/install.sh | bash
 ```
 
-It downloads the project into `~/.ppcosx`, builds QEMU (a few minutes, once)
-and adds a `ppcosx` command. Then either install Tiger from a DVD image:
+That's it. It takes a few minutes the first time, and when it's done you
+have a new `ppcosx` command. (If Terminal says `ppcosx: command not found`,
+open a new Terminal window.)
+
+## Set up Mac OS X
+
+Pick **one**:
+
+**A. Install Tiger from a DVD image**
 
 ```bash
-ppcosx install ~/Downloads/MacOSX-10.4-Tiger.iso
+ppcosx install ~/Downloads/MacOSX-Tiger.iso
 ```
 
-or bring a disk you already have (`.vmdk`, `.qcow2`, `.vdi`, `.vhd`, raw
-`.img`, or a whole UTM `.utm` bundle):
+A window opens with the Tiger installer. First open **Utilities → Disk
+Utility**, erase the hard disk as *Mac OS Extended (Journaled)*, then
+install onto it. The [step-by-step guide](docs/GETTING-STARTED.md#3a-install-tiger-from-a-dvd-image)
+walks through every screen.
+
+**B. Use a Tiger disk you already have**
 
 ```bash
-ppcosx import ~/VMs/Tiger.vmdk
+ppcosx import ~/VMs/Tiger.vmdk        # also .qcow2 .vdi .vhd .img, or a UTM .utm
 ```
 
-and boot it:
+Your original file is copied and never changed.
+
+## Start it
 
 ```bash
-ppcosx            # with the Radeon 9700 (3D acceleration)
-ppcosx --vga      # safe mode: plain framebuffer
-ppcosx --attach-dvd ~/Discs/SomeApp.dmg   # boot with a disc image inserted
+ppcosx
 ```
 
-`ppcosx doctor` checks everything, `ppcosx update` gets the latest version,
-and `ppcosx help` lists all commands. Prefer a manual checkout? See
-[Getting started](docs/GETTING-STARTED.md#2-get-the-code-and-build).
+![The Tiger desktop running on the emulated Radeon 9700](docs/images/desktop.png)
 
-## Documentation
+Other handy ways to start it:
 
-| | |
+| Type this | To do this |
 |---|---|
-| [Getting started](docs/GETTING-STARTED.md) | Setup, installing Tiger step by step, importing a disk, first boot |
-| [Using ppcosx](docs/USAGE.md) | Every command and option, keyboard and mouse, snapshots, networking |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | Things that go wrong, and fixes |
-| [The ATI ROM](docs/ROM.md) | Why the ROM is optional, and how to use one |
-| [How it works](docs/HOW-IT-WORKS.md) | The emulated Radeon, the boot chain, the Metal translation |
-| [Developing](docs/DEVELOPING.md) | Repo layout, rebuilding, debug switches, tests |
+| `ppcosx` | Start Mac OS X with 3D graphics |
+| `ppcosx --vga` | **Safe mode**: simple graphics, if something looks wrong |
+| `ppcosx --attach-dvd ~/Discs/App.dmg` | Start with a CD/DVD image inserted, e.g. to install software |
+| `ppcosx --ram 2048` | Give it more memory (up to 2048 MB) |
+| `ppcosx --snapshot` | Try something risky: nothing you do is saved |
+| `ppcosx doctor` | Check that everything is set up correctly |
+| `ppcosx update` | Get the latest version |
+| `ppcosx help` | See every command and option |
+
+## Good to know
+
+* 🖱️ **Mouse stuck in the window?** Press **Ctrl + Option + G** to get it
+  back.
+* ⏻ **Turning it off:** use **Apple menu → Shut Down** inside Mac OS X, like a real
+  Mac. Closing the window is like pulling the power plug.
+* 💾 **Save a restore point:** with the VM off, run
+  `ppcosx snapshot save my-backup`, and later
+  `ppcosx snapshot restore my-backup`.
+* 🐢 **Speed:** the whole PowerPC processor is emulated in software, so
+  expect roughly a G4-era Mac. The graphics are fast, heavy apps are not.
+* 📁 **Your files** (the Mac OS X disk and settings) live in `~/.ppcosx/vm`.
+* ✅ **Is 3D really working?** In Mac OS X, open Apple menu → About This Mac →
+  More Info → Graphics/Displays. It should say **ATI Radeon 9700 Pro**, with
+  Quartz Extreme and Core Image *Supported*.
+
+## Something not working?
+
+1. Run `ppcosx doctor`. It checks the usual suspects.
+2. Try safe mode: `ppcosx --vga`.
+3. Look in the [troubleshooting guide](docs/TROUBLESHOOTING.md).
+4. Still stuck? [Open an issue](https://github.com/linuxkid473/ppcosxkvm/issues)
+   with the output of `ppcosx doctor`, your Tiger version, and a
+   screenshot.
 
 ## Status
 
-Verified on Tiger 10.4.11:
+Tested on **Mac OS X 10.4.11**. For the best results, update Tiger to
+10.4.11 with Apple's *10.4.11 Combo Update (PPC)*.
 
-| Works | Notes |
+| | |
 |---|---|
-| Desktop with Quartz Extreme | Window server compositing, window dragging, the Dock, QuickTime movies |
-| Core Image | Reported as *Supported*; the R300 fragment programs it needs are implemented |
-| OpenGL apps | Chess is the main test: depth, stencil, 2× MSAA, textures, picking |
-| Hardware cursor, USB keyboard and mouse | |
-| System Profiler shows "ATI Radeon 9700 Pro" | Works without an ATI ROM |
+| ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess), hardware cursor, keyboard and mouse |
+| 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768 |
+| ❌ Not yet | Leopard (10.5), multiple CPUs, video decode acceleration |
 
-Expected to work but not re-tested since the move to `ppcosx`: networking
-(NAT), sound, and **installing from a DVD image** (`ppcosx install` uses the
-standard QEMU Tiger recipe; please open an issue if it fails for you).
+## More documentation
 
-**Not yet:** Leopard (untested), more than 1024×768 in the Radeon mode
-(experimental; use `--res`), and multiple CPUs (the guest is a single G4 on
-TCG, so expect a fast G4 rather than a G5). See the
-[limitations](docs/HOW-IT-WORKS.md#limitations).
+* 📘 [Getting started](docs/GETTING-STARTED.md): the full walkthrough
+* 🧰 [Using ppcosx](docs/USAGE.md): every command and option, moving files in and out
+* 🩺 [Troubleshooting](docs/TROUBLESHOOTING.md)
+* 🔌 [The ATI ROM](docs/ROM.md): optional, and why
+* 🔬 [How it works](docs/HOW-IT-WORKS.md): the emulated Radeon and the Metal translation
+* 🛠️ [Developing](docs/DEVELOPING.md): building from source, debug switches, tests
 
 ## Legal
 
-* The launcher, docs and tools in this repo are GPL-2.0-or-later
-  ([LICENSE](LICENSE)). The QEMU fork (`qemu/`) is GPL-2.0, like QEMU.
-* The firmware in [`firmware/`](firmware/README.md) is free software (OpenBIOS
-  GPL-2.0, QemuMacDrivers GPL-2.0, ndrvloader MIT).
-* **No Apple or ATI software is included.** You supply Mac OS X yourself, and
-  the ATI ROM is optional.
+* **No Apple or ATI software is included.** You provide Mac OS X yourself.
+* The scripts and docs here are GPL-2.0-or-later ([LICENSE](LICENSE)).
+  The QEMU fork is GPL-2.0, like QEMU.
+* The bundled [firmware](firmware/README.md) is free software (OpenBIOS,
+  QemuMacDrivers and classicvirtio).
 
-## Credits
+## Thanks
 
-Built on [QEMU](https://www.qemu.org),
-[Spartan0285/poweremu-qemu](https://github.com/Spartan0285/poweremu-qemu)
-(the RV280 / Radeon 9200 emulation this extends to the R300), and
-[PowerEmu](https://github.com/Spartan0285/PowerEmu) (the hardware cursor NDRV
-patcher). It also uses [OpenBIOS](https://github.com/openbios/openbios) as
-shipped by [UTM](https://github.com/utmapp/UTM),
+Built on [QEMU](https://www.qemu.org) and
+[Spartan0285/poweremu-qemu](https://github.com/Spartan0285/poweremu-qemu),
+whose Radeon 9200 emulation this project extends to the Radeon 9700, with
+the hardware cursor driver from [PowerEmu](https://github.com/Spartan0285/PowerEmu).
+It also uses [OpenBIOS](https://github.com/openbios/openbios) as shipped by
+[UTM](https://github.com/utmapp/UTM),
 [QemuMacDrivers](https://github.com/ozbenh/QemuMacDrivers),
 [classicvirtio](https://github.com/elliotnunn/classicvirtio), and Mesa's
-r300 documentation.
+R300 documentation.
