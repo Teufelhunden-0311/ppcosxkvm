@@ -24,7 +24,7 @@ QEMU   │   ati-radeon-9700 device (hw/display/ppc_mac_gpu.c)
        │     │   scratch/fence write-backs, 2D blits
        │     ├─ R300 3D state (hw/display/r300/r300_state.c)
        │     ├─ vertex programs (PVS) interpreted on the CPU (r300_pvs.c)
-       │     ├─ fragment programs (US) → Metal Shading Language (r300_us.c)
+       │     ├─ fragment programs (US) → GLSL (r300_us.c) → SPIR-V → MSL (r300_spirv.c)
        │     └─ draw assembly: primitives, index buffers, point sprites (r300_draw.c)
        │   Metal backend (hw/display/ppc_mac_gpu_metal.m)
        │     └─ render targets and textures in VRAM ⇄ Metal textures
@@ -77,8 +77,12 @@ For each draw, the device snapshots the R300 state and:
   CPU interpreter of the R300 vertex shader ISA (including flow control),
   giving clip-space positions and varyings.
 * **Fragment processing (US):** the R300 fragment program (texture
-  instructions plus RGB/alpha ALU instructions) is translated to a Metal
-  fragment shader, compiled once and cached by program hash.
+  instructions plus RGB/alpha ALU instructions) is translated to GLSL,
+  compiled to SPIR-V with shaderc and, for Metal, on to Metal Shading
+  Language with SPIRV-Cross. The shader reads the colour and depth
+  buffers it blends into through input attachments, which become Metal
+  framebuffer fetch. Each program is compiled once and cached by its
+  source.
 * **Fixed function:** blending, alpha test, depth/stencil (done in the
   shader against a depth attachment), culling, polygon offset and mode,
   scissors and cliprects, fog, user clip planes, colour masks and ROPs.

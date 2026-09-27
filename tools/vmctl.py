@@ -9,7 +9,7 @@ Start the VM with `./ppcosx run --monitor`, then:
     tools/vmctl.py shot out.png            screenshot
     tools/vmctl.py click X Y [right]       click / dclick / move / drag x0 y0 x1 y1
 
-Coordinates are guest pixels at 1024x768.
+Coordinates are guest pixels at 1024x768 (VMCTL_RES=WxH for other sizes).
 """
 import socket, sys, time, json, os, subprocess
 
@@ -74,7 +74,7 @@ def qmp(cmds):
     s.close()
     return res
 
-W, H = 1024, 768
+W, H = map(int, os.environ.get("VMCTL_RES", "1024x768").split("x"))  # guest screen size
 SCALE = 1.1775      # Tiger's HID stack scales tablet input about the centre
 def absev(x, y):
     x = (x - W / 2) / SCALE + W / 2

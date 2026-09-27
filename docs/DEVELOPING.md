@@ -12,7 +12,7 @@ firmware/               OpenBIOS, ndrvloader, NDRV (+ sources/patchers in src/)
 qemu/                   git submodule: the QEMU fork (branch r300)
   hw/display/ppc_mac_gpu.c        the device: PCI, MMIO, CP/PM4, GART, 2D, scanout
   hw/display/ppc_mac_gpu_metal.m  Metal backend
-  hw/display/r300/                R300 3D: state, PVS, US→MSL, draw assembly
+  hw/display/r300/                R300 3D: state, PVS, US→GLSL, SPIR-V/MSL, draw assembly
   tests/r300/                     offline tests (run.sh)
 tools/vmctl.py          drive a running VM: keys, clicks, screenshots, HMP
 docs/                   these documents
@@ -56,10 +56,12 @@ The R300 translation layers are tested without a guest:
 qemu/tests/r300/run.sh
 ```
 
-This runs the vertex-program interpreter, fragment-program → MSL
-translation (compiled by the Metal compiler to check the output is valid),
-draw assembly, depth/stencil, formats and rasterizer tests. A few of them
-render through Metal.
+This runs the vertex-program interpreter, fragment-program → GLSL
+translation (both variants: validated as SPIR-V with `glslangValidator`
+and `spirv-val`, and cross-compiled to MSL and checked by the Metal
+compiler), draw assembly, depth/stencil, formats and rasterizer tests. A
+few of them render through Metal. It needs `brew install shaderc
+spirv-cross glslang` (`ppcosx setup` installs them).
 
 ## Debug switches
 

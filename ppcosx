@@ -39,7 +39,7 @@ CPU_MHZ_DEFAULT=2000  # CPU speed Mac OS X is told (reporting only; QEMU says 90
 # firmware's own "PowerMac3,1" would need a G5.  "default" keeps that.
 MODEL_DEFAULT=PowerBook5,8
 RADEON_SLOT=e         # PCI slot of the Radeon; names its device-tree node
-BREW_DEPS="ninja pkgconf glib pixman libslirp"
+BREW_DEPS="ninja pkgconf glib pixman libslirp shaderc spirv-cross glslang"
 
 # ---------------------------------------------------------------- output ---
 if [ -t 1 ]; then
