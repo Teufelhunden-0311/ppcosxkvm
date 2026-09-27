@@ -28,7 +28,7 @@
 | `--rom PATH` / `--no-rom` | `vm/roms/radeon9700.rom` if present | Radeon option ROM. |
 | `--cd PATH` | | Attach a CD/DVD image, e.g. to install software from a disc. |
 | `--verbose` | off | Text-mode ("verbose") boot instead of the grey Apple. Good for diagnosing hangs. |
-| `--snapshot` | off | Throwaway session: all disk writes are discarded when QEMU exits. Also allows a second copy of an already running disk. |
+| `--snapshot` | off | Throwaway session: all disk writes are discarded when QEMU exits. The disk must not be in use by another VM. |
 | `--ssh-port N` | | Forward `127.0.0.1:N` on the host to the guest's SSH (turn on *Remote Login* in the guest's Sharing preferences). |
 | `--monitor` | off | QEMU's monitor on `127.0.0.1:4444` (HMP) and `:4445` (QMP), for `tools/vmctl.py` and scripting. |
 | `--trace-gpu` | off | Log every GPU register access to `vm/gpu-trace.log`. Very slow; for debugging only. |

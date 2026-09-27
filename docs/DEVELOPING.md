@@ -35,9 +35,15 @@ build directory.
 `qemu/` is a submodule tracking the `r300` branch of the fork:
 
 ```bash
-cd qemu && git checkout r300 && <commit your changes> && git push
+cd qemu
+git fetch origin r300 && git checkout -B r300 FETCH_HEAD   # once
+<commit your changes> && git push origin r300
 cd .. && git add qemu && git commit -m "qemu: bump"      # pin the new commit
 ```
+
+The fetch is needed because `setup` clones `qemu/` shallow at the pinned
+commit, which only tracks the fork's default branch (`poweremu`), not
+`r300`.
 
 Users get it with `git pull && git submodule update --init --depth 1 && ./ppcosx setup`.
 

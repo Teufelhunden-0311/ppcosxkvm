@@ -54,8 +54,9 @@ or screenshot of the panic text and your Tiger version. As a workaround,
 `--vga` still boots.
 
 **`a VM is already running on macosx.qcow2`.** Two VMs writing one disk
-would corrupt it. Close the other one, or use `--snapshot` for a
-read-only second copy.
+would corrupt it, so QEMU locks the disk while a VM uses it. Shut the
+other one down first. This applies to `--snapshot` too: QEMU refuses to
+open a disk another VM holds ("Failed to get shared "write" lock").
 
 **`port 4444 is in use`.** Another VM is running with `--monitor`. Close it,
 or leave `--monitor` off.
@@ -68,7 +69,8 @@ with `--vga`. Without it, check the boot log line
 launcher? `git pull` and try again.
 
 **VRAM (Total) says 256 MB.** Expected: System Profiler reports the size
-of the card's memory window (PCI BAR 0), which is 256 MB here.
+of the card's memory window (PCI BAR 0). It holds two apertures onto
+VRAM, so it's twice `--vram`: 256 MB at the default 128.
 
 **Slow.** It's a whole PowerPC Mac interpreted in software on one host
 core. Things that help: close apps you don't need in the guest, give it
