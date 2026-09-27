@@ -15,6 +15,7 @@
 /assets/
 /ref/
 /.buildenv/
+/.pyvenv/
 *.log
 .DS_Store
 __pycache__/
