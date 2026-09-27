@@ -25,35 +25,36 @@ with Quartz Extreme and Core Image both *Supported*.
 
 You need an Apple Silicon Mac, [Homebrew](https://brew.sh), and **your own**
 Mac OS X Tiger (PowerPC) install DVD image or an already installed PowerPC
-OS X disk.
+OS X disk. Paste this into Terminal:
 
 ```bash
-git clone https://github.com/linuxkid473/ppcosxkvm.git
-cd ppcosxkvm
-./ppcosx setup
+curl -fsSL https://raw.githubusercontent.com/linuxkid473/ppcosxkvm/main/install.sh | bash
 ```
 
-`setup` installs a few Homebrew packages and builds QEMU (about 5–10
-minutes, once). Then either install Tiger from a DVD image:
+It downloads the project into `~/.ppcosx`, builds QEMU (a few minutes, once)
+and adds a `ppcosx` command. Then either install Tiger from a DVD image:
 
 ```bash
-./ppcosx install ~/Downloads/MacOSX-10.4-Tiger.iso
+ppcosx install ~/Downloads/MacOSX-10.4-Tiger.iso
 ```
 
 or bring a disk you already have (`.vmdk`, `.qcow2`, `.vdi`, `.vhd`, raw
 `.img`, or a whole UTM `.utm` bundle):
 
 ```bash
-./ppcosx import ~/VMs/Tiger.vmdk
+ppcosx import ~/VMs/Tiger.vmdk
 ```
 
 and boot it:
 
 ```bash
-./ppcosx run
+ppcosx            # with the Radeon 9700 (3D acceleration)
+ppcosx --vga      # safe mode: plain framebuffer
 ```
 
-`./ppcosx doctor` checks everything, and `./ppcosx help` lists all commands.
+`ppcosx doctor` checks everything, `ppcosx update` gets the latest version,
+and `ppcosx help` lists all commands. Prefer a manual checkout? See
+[Getting started](docs/GETTING-STARTED.md#2-get-the-code-and-build).
 
 ## Documentation
 

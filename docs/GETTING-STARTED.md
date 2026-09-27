@@ -25,33 +25,51 @@ acceleration. If something goes wrong, see
 For the best result, update the guest to **10.4.11** (the "Mac OS X 10.4.11
 Combo Update (PPC)"). That's the version everything is tested on.
 
-## 2. Get the code and build
+## 2. Install ppcosx
+
+Paste this into Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/linuxkid473/ppcosxkvm/main/install.sh | bash
+```
+
+The installer:
+
+1. checks that this is a Mac with the Command Line Tools and Homebrew (it
+   tells you how to get whichever is missing, then you re-run it),
+2. downloads the project into `~/.ppcosx` (set `PPCOSX_HOME` to choose
+   another folder),
+3. `brew install`s `ninja pkgconf glib pixman libslirp` (only the missing ones),
+4. fetches the QEMU fork (a shallow git submodule, several hundred MB) and
+   builds `qemu-system-ppc` and `qemu-img`: a few minutes the first time,
+5. adds the `ppcosx` command: a link in Homebrew's `bin` folder, which is
+   already on your PATH, or else in `~/.local/bin`, added to your shell
+   profile. If the command isn't found afterwards, open a new terminal window.
+
+Running the one-liner again, or `ppcosx update`, updates to the latest
+version and rebuilds what changed. `ppcosx unlink` removes the command, and
+deleting `~/.ppcosx` removes everything, **including your VMs in
+`~/.ppcosx/vm`**, so copy those out first.
+
+### Manual install (for development)
 
 ```bash
 git clone https://github.com/linuxkid473/ppcosxkvm.git
 cd ppcosxkvm
 ./ppcosx setup
+./ppcosx link        # optional: put this checkout's ppcosx on your PATH
 ```
 
 Don't use `git clone --recursive`. It would also download QEMU's own nested
 submodules (EDK2, OpenSSL and more, several GB) that this project doesn't
-need. `setup` fetches just the QEMU fork.
-
-`setup`:
-
-1. checks that this is a Mac with the Command Line Tools and Homebrew,
-2. `brew install`s `ninja pkgconf glib pixman libslirp` (only the missing ones),
-3. fetches the QEMU fork into `qemu/` (a shallow git submodule, several
-   hundred MB),
-4. configures and builds `qemu-system-ppc` and `qemu-img` into `qemu/build/`.
-
-The first build takes 5–10 minutes. Running `setup` again later is safe; it
-only rebuilds what changed. Logs are in `qemu/build/ppcosx-*.log`.
+need; `setup` fetches just the QEMU fork. Without `link`, type `./ppcosx`
+from the checkout wherever these docs say `ppcosx`. Build logs are in
+`qemu/build/ppcosx-*.log`.
 
 ## 3a. Install Tiger from a DVD image
 
 ```bash
-./ppcosx install ~/Downloads/MacOSX-Tiger.iso
+ppcosx install ~/Downloads/MacOSX-Tiger.iso
 ```
 
 This creates an empty 40 GB disk at `vm/macosx.qcow2`, then boots the DVD in a
@@ -81,8 +99,8 @@ and this is the configuration the Tiger installer is known to work with.
 ## 3b. …or bring an existing disk
 
 ```bash
-./ppcosx import ~/VMs/Tiger.vmdk          # .vmdk .qcow2 .vdi .vhd .img
-./ppcosx import ~/Library/Containers/com.utmapp.UTM/Data/Documents/Tiger.utm
+ppcosx import ~/VMs/Tiger.vmdk          # .vmdk .qcow2 .vdi .vhd .img
+ppcosx import ~/Library/Containers/com.utmapp.UTM/Data/Documents/Tiger.utm
 ```
 
 The image is **copied** into `vm/macosx.qcow2`; your original is never
@@ -96,7 +114,7 @@ won't boot on this emulated G4.
 ## 4. Boot
 
 ```bash
-./ppcosx run
+ppcosx run
 ```
 
 The first boot after an install runs the Setup Assistant (the welcome movie,
@@ -113,14 +131,14 @@ Things to know:
   window closes. Closing the window or pressing Cmd+Q is like pulling the
   plug: fine in an emergency, but journaled HFS+ will have to replay its
   journal next boot.
-* **Something looks wrong?** Boot with `./ppcosx run --vga`. That's the plain
+* **Something looks wrong?** Boot with `ppcosx run --vga`. That's the plain
   framebuffer with no Radeon, useful for telling a graphics problem from
   anything else.
 
 ## 5. Next steps
 
 * Take a snapshot of the clean install before experimenting:
-  `./ppcosx snapshot save fresh-install` (with the VM shut down).
+  `ppcosx snapshot save fresh-install` (with the VM shut down).
 * See [USAGE.md](USAGE.md) for all options: memory, video memory,
   resolution, SSH forwarding, throwaway sessions and more.
 * Optionally give it the real card's ROM: [ROM.md](ROM.md).

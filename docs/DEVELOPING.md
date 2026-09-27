@@ -4,10 +4,11 @@
 
 ```
 ppcosx                  the launcher: setup, install, import, run, …
+install.sh              the one-line installer (clone to ~/.ppcosx, setup, link)
 firmware/               OpenBIOS, ndrvloader, NDRV (+ sources/patchers in src/)
   radeon/               firmware for the Radeon mode
   vga/                  stock UTM firmware for installing and --vga
-  SHA1SUMS              checked by ./ppcosx doctor
+  SHA1SUMS              checked by ppcosx doctor
 qemu/                   git submodule: the QEMU fork (branch r300)
   hw/display/ppc_mac_gpu.c        the device: PCI, MMIO, CP/PM4, GART, 2D, scanout
   hw/display/ppc_mac_gpu_metal.m  Metal backend
@@ -24,10 +25,10 @@ After changing QEMU sources:
 
 ```bash
 ninja -C qemu/build qemu-system-ppc
-./ppcosx run
+ppcosx run
 ```
 
-`./ppcosx setup` does the same, and also re-runs configure on a fresh
+`ppcosx setup` does the same, and also re-runs configure on a fresh
 build directory.
 
 ## Updating the QEMU fork
@@ -45,7 +46,7 @@ The fetch is needed because `setup` clones `qemu/` shallow at the pinned
 commit, which only tracks the fork's default branch (`poweremu`), not
 `r300`.
 
-Users get it with `git pull && git submodule update --init --depth 1 && ./ppcosx setup`.
+Users get it with `git pull && git submodule update --init --depth 1 && ppcosx setup`.
 
 ## Offline tests
 
@@ -76,18 +77,18 @@ Environment variables read by the device. Set them in front of `ppcosx run`:
 | `QEMU_COCOA_SRGB=1` | Exact sRGB colour conversion in the Cocoa UI (slower). |
 | `QEMU_PPC_NDRV=path` | Use a different NDRV (set by `ppcosx run`). |
 
-`./ppcosx run --trace-gpu` enables QEMU's `ppc_mac_gpu_*` trace events (every
+`ppcosx run --trace-gpu` enables QEMU's `ppc_mac_gpu_*` trace events (every
 register access) into `vm/gpu-trace.log`. It's large and slow, but complete.
 
 Example:
 
 ```bash
-R300_DRAWLOG=/tmp/draws.log ./ppcosx run --snapshot --verbose
+R300_DRAWLOG=/tmp/draws.log ppcosx run --snapshot --verbose
 ```
 
 ## Driving the guest from scripts
 
-`./ppcosx run --monitor` opens the QEMU monitor on 127.0.0.1:4444 (HMP) and
+`ppcosx run --monitor` opens the QEMU monitor on 127.0.0.1:4444 (HMP) and
 4445 (QMP). `tools/vmctl.py` wraps it:
 
 ```bash

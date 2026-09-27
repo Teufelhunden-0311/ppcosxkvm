@@ -1,24 +1,24 @@
 # Troubleshooting
 
-Start with `./ppcosx doctor`. It checks most of what's below.
+Start with `ppcosx doctor`. It checks most of what's below.
 
 ## Setup and building
 
 **`xcode-select: note: install requested`, then setup stops.** Finish the
-Command Line Tools install in the dialog, then run `./ppcosx setup` again.
+Command Line Tools install in the dialog, then run `ppcosx setup` again.
 
 **`Homebrew is required`.** Install it from <https://brew.sh>, open a *new*
 terminal window (so `brew` is on your `PATH`), and re-run setup.
 
 **`qemu/ is empty` / `could not fetch the qemu submodule`.** Fetching the
 QEMU fork failed. Check your network, then run
-`git submodule update --init --depth 1 qemu` and `./ppcosx setup`.
+`git submodule update --init --depth 1 qemu` and `ppcosx setup`.
 
 **configure or the build fails.** Read the log the error names
 (`qemu/build/ppcosx-configure.log` or `ppcosx-build.log`). Common causes:
 
 * a Homebrew package is broken or half-upgraded: `brew update && brew upgrade`, then re-run setup;
-* stale build files after a big `git pull`: `rm -rf qemu/build && ./ppcosx setup`.
+* stale build files after a big `git pull`: `rm -rf qemu/build && ppcosx setup`.
 
 ## Installing
 
@@ -42,8 +42,8 @@ Utility → select the QEMU HARDDISK → Erase → Mac OS Extended (Journaled).
 
 ## Booting
 
-**Black window or a stuck grey Apple.** Boot with `./ppcosx run --verbose`
-to see where it stops. Then try `./ppcosx run --vga`:
+**Black window or a stuck grey Apple.** Boot with `ppcosx run --verbose`
+to see where it stops. Then try `ppcosx run --vga`:
 
 * if `--vga` boots, the problem is in the Radeon path. Please open an
   issue with the last lines of the verbose boot and `vm/gpu-trace.log`.
@@ -89,7 +89,7 @@ ways to move files.
 
 Please include:
 
-* the output of `./ppcosx doctor`,
-* the exact `./ppcosx` command,
+* the output of `ppcosx doctor`,
+* the exact `ppcosx` command,
 * your Tiger version (Apple menu → About This Mac),
 * `vm/gpu-trace.log` for graphics problems, and a screenshot.

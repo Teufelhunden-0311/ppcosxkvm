@@ -9,7 +9,21 @@
 # no ${var,,}, no mapfile.
 set -u
 
-REPO=$(cd "$(dirname "$0")" && pwd -P)
+resolve() {   # print the real path of $1, following symlinks
+    local f="$1" l
+    while [ -L "$f" ]; do
+        l=$(readlink "$f")
+        case "$l" in /*) f="$l" ;; *) f="$(dirname "$f")/$l" ;; esac
+    done
+    printf '%s/%s\n' "$(cd "$(dirname "$f")" && pwd -P)" "$(basename "$f")"
+}
+# Follow symlinks (ppcosx link puts one on the PATH) back to the checkout.
+REPO=$(dirname "$(resolve "$0")")
+# How to tell the user to call us: plain "ppcosx" once it's on the PATH.
+PROG=./ppcosx
+if command -v ppcosx >/dev/null 2>&1 && [ "$(resolve "$(command -v ppcosx)")" = "$REPO/ppcosx" ]; then
+    PROG=ppcosx
+fi
 VM_DIR="${PPCOSX_VM_DIR:-$REPO/vm}"
 QEMU_DIR="$REPO/qemu"
 QEMU_BUILD="$QEMU_DIR/build"
@@ -38,11 +52,11 @@ hint() { printf '    %s%s%s\n' "$D" "$*" "$N"; }
 qemu_img() {
     if [ -x "$QEMU_IMG_BUILT" ]; then "$QEMU_IMG_BUILT" "$@"
     elif command -v qemu-img >/dev/null 2>&1; then qemu-img "$@"
-    else die "qemu-img not found - run ./ppcosx setup first"; fi
+    else die "qemu-img not found - run $PROG setup first"; fi
 }
 
 need_qemu() {
-    [ -x "$QEMU" ] || die "QEMU is not built yet. Run:  ./ppcosx setup"
+    [ -x "$QEMU" ] || die "QEMU is not built yet. Run:  $PROG setup"
 }
 
 abspath() {
@@ -68,31 +82,36 @@ ${B}ppcosx${N} - PowerPC Mac OS X (Tiger) on Apple Silicon, with an emulated
 ATI Radeon 9700 PRO (Quartz Extreme, Core Image and OpenGL via Metal).
 
 ${B}First time${N}
-  ./ppcosx setup                 install build tools and build QEMU (~10 min)
-  ./ppcosx install <tiger.iso>   install Mac OS X from a DVD image (.iso .cdr .dmg .toast)
+  ppcosx install <tiger.iso>   install Mac OS X from a DVD image (.iso .cdr .dmg .toast)
     or
-  ./ppcosx import <disk>         use an existing PowerPC OS X disk
-                                 (.qcow2 .vmdk .vdi .vhd .img .utm bundle)
-  ./ppcosx rom <file.rom>        (optional) your Mac Radeon 9700 PRO ROM
+  ppcosx import <disk>         use an existing PowerPC OS X disk
+                               (.qcow2 .vmdk .vdi .vhd .img .utm bundle)
+  ppcosx rom <file.rom>        (optional) your Mac Radeon 9700 PRO ROM
 
 ${B}Every day${N}
-  ./ppcosx run                   boot with the Radeon 9700 (3D acceleration)
-  ./ppcosx run --vga             boot with a plain framebuffer (safe mode)
-  ./ppcosx doctor                check that everything is in place
+  ppcosx                       boot the VM with the Radeon 9700 (3D acceleration)
+  ppcosx --vga                 boot with a plain framebuffer (safe mode)
+  ppcosx --ram 2048 --verbose  any run option works directly (see below)
+  ppcosx doctor                check that everything is in place
 
 ${B}Disks${N}
-  ./ppcosx new-disk [size] [path]
-                                 create an empty disk (default 40G at vm/macosx.qcow2)
-  ./ppcosx snapshot list|save|restore|delete [name]
-                                 disk snapshots (VM must be shut down)
+  ppcosx new-disk [size] [path]  create an empty disk (default 40G at vm/macosx.qcow2)
+  ppcosx snapshot list|save|restore|delete [name]
+                               disk snapshots (VM must be shut down)
 
-${B}run options${N}
+${B}Maintenance${N}
+  ppcosx update                get the latest version and rebuild
+  ppcosx setup                 install build tools and (re)build QEMU
+  ppcosx link | unlink         add or remove the 'ppcosx' command on your PATH
+
+${B}Run options${N} (for "ppcosx", "ppcosx run" and "ppcosx install")
   --disk PATH      disk image to boot        (default: vm/macosx.qcow2)
   --ram MB         guest memory, 256-2048    (default: 1024)
   --vram MB        Radeon video memory 64/128/256 (default: 128)
   --res WxH        screen size               (default: 1024x768)
   --rom PATH       Radeon ROM to use         (default: vm/roms/radeon9700.rom if present)
   --no-rom         boot without the ROM, even if one is installed
+  --vga            plain framebuffer instead of the Radeon
   --cd PATH        also attach a CD/DVD image
   --verbose        verbose (text) boot instead of the grey Apple
   --snapshot       throw away all disk writes when the VM quits
@@ -101,8 +120,12 @@ ${B}run options${N}
   --trace-gpu      log every GPU register access to vm/gpu-trace.log (slow)
   -- ARGS...       pass the remaining arguments straight to QEMU
 
-Files live in ${VM_DIR/#$REPO\//}/ (override with PPCOSX_VM_DIR). Docs: docs/README.md
+Files live in $VM_DIR (override with PPCOSX_VM_DIR).
+Program: $REPO   Docs: https://github.com/linuxkid473/ppcosxkvm/tree/main/docs
 EOF
+    if [ "$PROG" != ppcosx ]; then
+        printf '\n%sppcosx is not on your PATH yet: type %s instead, or run "%s link".%s\n' "$Y" "$PROG" "$PROG" "$N"
+    fi
 }
 
 # ----------------------------------------------------------------- setup ---
@@ -120,7 +143,7 @@ cmd_setup() {
     if ! xcode-select -p >/dev/null 2>&1; then
         warn "Xcode Command Line Tools are missing; starting the installer"
         xcode-select --install 2>/dev/null || true
-        die "finish the Command Line Tools install, then run ./ppcosx setup again"
+        die "finish the Command Line Tools install, then run $PROG setup again"
     fi
     ok "Command Line Tools ($(xcode-select -p))"
 
@@ -130,7 +153,7 @@ cmd_setup() {
         done
     fi
     command -v brew >/dev/null 2>&1 || die "Homebrew is required: https://brew.sh
-    Install it, open a new terminal, and run ./ppcosx setup again."
+    Install it, open a new terminal, and run $PROG setup again."
     ok "Homebrew ($(brew --prefix))"
 
     local missing=
@@ -183,13 +206,14 @@ cmd_setup() {
     ok "built $(basename "$QEMU")"
 
     mkdir -p "$VM_DIR/roms"
+    [ -n "${PPCOSX_INSTALLER:-}" ] && return 0   # install.sh prints its own next steps
     echo
     say "Setup complete. Next:"
     if [ -f "$DISK_DEFAULT" ]; then
-        hint "./ppcosx run"
+        hint "$PROG run"
     else
-        hint "./ppcosx install /path/to/MacOSX-Tiger.iso     (fresh install)"
-        hint "./ppcosx import  /path/to/existing-disk.vmdk   (existing PowerPC OS X disk)"
+        hint "$PROG install /path/to/MacOSX-Tiger.iso     (fresh install)"
+        hint "$PROG import  /path/to/existing-disk.vmdk   (existing PowerPC OS X disk)"
     fi
 }
 
@@ -217,7 +241,7 @@ cmd_doctor() {
             && ok "ati-radeon-9700 device present" \
             || { bad "this QEMU has no ati-radeon-9700 device"; fail=1; }
     else
-        bad "QEMU not built"; hint "./ppcosx setup"; fail=1
+        bad "QEMU not built"; hint "$PROG setup"; fail=1
     fi
     for f in "$FW_RADEON/openbios-ppc" "$FW_RADEON/ppc-ndrvloader" "$FW_RADEON/qemu_vga_hwc.ndrv" \
              "$FW_VGA/openbios-ppc" "$FW_VGA/ppc-ndrvloader"; do
@@ -230,7 +254,7 @@ cmd_doctor() {
     if [ -f "$DISK_DEFAULT" ]; then
         ok "disk ${DISK_DEFAULT#$REPO/} ($(human_size "$(disk_size "$DISK_DEFAULT")"))"
     else
-        warn "no disk yet"; hint "./ppcosx install <iso>   or   ./ppcosx import <disk>"
+        warn "no disk yet"; hint "$PROG install <iso>   or   $PROG import <disk>"
     fi
     if [ -f "$ROM_DEFAULT" ]; then
         rom_check "$ROM_DEFAULT" >/dev/null && ok "Radeon ROM $(rom_check "$ROM_DEFAULT")" \
@@ -267,7 +291,7 @@ PY
 }
 
 cmd_rom() {
-    [ $# -ge 1 ] || die "usage: ./ppcosx rom <file.rom>   (or: ./ppcosx rom --remove)"
+    [ $# -ge 1 ] || die "usage: $PROG rom <file.rom>   (or: $PROG rom --remove)"
     if [ "$1" = --remove ]; then
         rm -f "$ROM_DEFAULT"; ok "ROM removed; the Radeon runs without one"; return
     fi
@@ -300,7 +324,7 @@ cmd_import() {
         esac
         shift
     done
-    [ -n "$src" ] || die "usage: ./ppcosx import <disk image or .utm bundle> [--as out.qcow2] [--force]"
+    [ -n "$src" ] || die "usage: $PROG import <disk image or .utm bundle> [--as out.qcow2] [--force]"
     [ -e "$src" ] || die "no such file: $src"
     src=$(abspath "$src")
 
@@ -311,7 +335,7 @@ cmd_import() {
         src="$f"
     fi
     case "$src" in
-        *.dmg|*.iso|*.cdr|*.toast) die "$(basename "$src") looks like an installer; use: ./ppcosx install \"$src\"" ;;
+        *.dmg|*.iso|*.cdr|*.toast) die "$(basename "$src") looks like an installer; use: $PROG install \"$src\"" ;;
     esac
     if [ -e "$dst" ] && [ $force = 0 ]; then
         die "${dst#$REPO/} already exists. Use --force to replace it, or --as other.qcow2"
@@ -322,7 +346,7 @@ cmd_import() {
     qemu_img convert -p -O qcow2 "$src" "$dst.part" || { rm -f "$dst.part"; die "conversion failed"; }
     mv -f "$dst.part" "$dst"
     ok "imported"
-    hint "Boot it:  ./ppcosx run$( [ "$dst" != "$DISK_DEFAULT" ] && printf ' --disk %s' "$dst")"
+    hint "Boot it:  $PROG run$( [ "$dst" != "$DISK_DEFAULT" ] && printf ' --disk %s' "$dst")"
 }
 
 # ------------------------------------------------------------- snapshots ---
@@ -335,13 +359,13 @@ cmd_snapshot() {
     fi
     case "$action" in
         list)    qemu_img snapshot -l "$disk" ;;
-        save)    [ $# = 1 ] || die "usage: ./ppcosx snapshot save <name>"
+        save)    [ $# = 1 ] || die "usage: $PROG snapshot save <name>"
                  qemu_img snapshot -c "$1" "$disk" && ok "saved snapshot '$1'" ;;
-        restore) [ $# = 1 ] || die "usage: ./ppcosx snapshot restore <name>"
+        restore) [ $# = 1 ] || die "usage: $PROG snapshot restore <name>"
                  qemu_img snapshot -a "$1" "$disk" && ok "disk restored to '$1'" ;;
-        delete)  [ $# = 1 ] || die "usage: ./ppcosx snapshot delete <name>"
+        delete)  [ $# = 1 ] || die "usage: $PROG snapshot delete <name>"
                  qemu_img snapshot -d "$1" "$disk" && ok "deleted snapshot '$1'" ;;
-        *) die "usage: ./ppcosx snapshot list|save|restore|delete [name]" ;;
+        *) die "usage: $PROG snapshot list|save|restore|delete [name]" ;;
     esac
 }
 
@@ -395,7 +419,7 @@ parse_run_opts() {
             --trace-gpu) TRACE=1 ;;
             --) shift; EXTRA=("$@"); break ;;
             -h|--help) usage; exit 0 ;;
-            *) die "unknown option: $1 (see ./ppcosx help)" ;;
+            *) die "unknown option: $1 (see $PROG help)" ;;
         esac
         shift
     done
@@ -414,8 +438,8 @@ cmd_run() {
     need_qemu
     parse_run_opts "$@"
     [ -f "$DISK" ] || die "no disk at ${DISK#$REPO/}
-    Install Mac OS X first:  ./ppcosx install <tiger.iso>
-    or bring a disk:         ./ppcosx import <disk.vmdk|.qcow2|.utm>"
+    Install Mac OS X first:  $PROG install <tiger.iso>
+    or bring a disk:         $PROG import <disk.vmdk|.qcow2|.utm>"
     if pgrep -f "qemu-system-ppc.*$(basename "$DISK")" >/dev/null 2>&1; then
         die "a VM is already running on $(basename "$DISK"); shut it down first"
     fi
@@ -498,7 +522,7 @@ cmd_install() {
         esac
         shift
     done
-    [ -n "$iso" ] || die "usage: ./ppcosx install <Mac OS X install DVD: .iso .cdr .dmg .toast> [--size 40G]"
+    [ -n "$iso" ] || die "usage: $PROG install <Mac OS X install DVD: .iso .cdr .dmg .toast> [--size 40G]"
     [ -f "$iso" ] || die "no such file: $iso"
 
     case "$iso" in
@@ -543,15 +567,70 @@ ${B}Installing Mac OS X from $(basename "$iso") onto ${DISK#$REPO/}${N}
   3. Continue the installer and pick the new volume. The install takes
      roughly 30-60 minutes; "Customize" and unticking printer drivers and
      extra languages makes it much faster.
-  4. When it restarts, this window closes. Then boot it with:  ${B}./ppcosx run${N}
+  4. When it restarts, this window closes. Then boot it with:  ${B}$PROG run${N}
 
 EOF
     exec "$QEMU" "${QARGS[@]}"
 }
 
+# ------------------------------------------------------ link / update ---
+# Put ppcosx on the PATH: Homebrew's bin if it's writable and on the PATH
+# (no shell edits needed), else ~/.local/bin, added to the shell profile.
+cmd_link() {
+    local bin= rc= line
+    if command -v brew >/dev/null 2>&1; then
+        bin="$(brew --prefix)/bin"
+        case ":$PATH:" in *":$bin:"*) [ -w "$bin" ] || bin= ;; *) bin= ;; esac
+    fi
+    if [ -z "$bin" ]; then
+        bin="$HOME/.local/bin"
+        mkdir -p "$bin"
+        case ":$PATH:" in
+            *":$bin:"*) ;;
+            *)
+                case "${SHELL:-}" in */bash) rc="$HOME/.bash_profile" ;; *) rc="$HOME/.zshrc" ;; esac
+                line='export PATH="$HOME/.local/bin:$PATH"   # added by ppcosx'
+                grep -qF "$line" "$rc" 2>/dev/null || printf '\n%s\n' "$line" >> "$rc"
+                ;;
+        esac
+    fi
+    if [ -e "$bin/ppcosx" ] && [ ! -L "$bin/ppcosx" ]; then
+        die "$bin/ppcosx exists and isn't a link; move it away and run: $PROG link"
+    fi
+    ln -sfn "$REPO/ppcosx" "$bin/ppcosx" || die "could not create $bin/ppcosx"
+    ok "linked $bin/ppcosx -> $REPO/ppcosx"
+    if [ -n "$rc" ]; then
+        hint "Added $bin to your PATH in $rc; open a new terminal window to use 'ppcosx'."
+    fi
+}
+
+cmd_unlink() {
+    local f
+    for f in "$(brew --prefix 2>/dev/null)/bin/ppcosx" "$HOME/.local/bin/ppcosx"; do
+        if [ -L "$f" ] && [ "$(resolve "$f")" = "$REPO/ppcosx" ]; then
+            rm -f "$f" && ok "removed $f"
+        fi
+    done
+    hint "Your VMs are untouched in ${VM_DIR}; the program itself is in $REPO."
+}
+
+cmd_update() {
+    [ -d "$REPO/.git" ] || die "$REPO is not a git checkout; reinstall with the one-line installer"
+    say "Updating $REPO"
+    git -C "$REPO" pull --ff-only || die "git pull failed (local changes in $REPO?)"
+    git -C "$REPO" submodule update --init --depth 1 qemu || die "could not update qemu/"
+    cmd_setup
+}
+
 # ------------------------------------------------------------------ main ---
-cmd="${1:-help}"
-[ $# -gt 0 ] && shift
+# "ppcosx --vga" is short for "ppcosx run --vga", and a bare "ppcosx" boots
+# the VM once there is one to boot.
+if [ $# -eq 0 ]; then
+    if [ -x "$QEMU" ] && [ -f "$DISK_DEFAULT" ]; then set -- run; else set -- help; fi
+fi
+case "$1" in -h|--help) ;; -*) set -- run "$@" ;; esac
+cmd="$1"
+shift
 case "$cmd" in
     setup)            cmd_setup "$@" ;;
     doctor|check)     cmd_doctor "$@" ;;
@@ -561,6 +640,9 @@ case "$cmd" in
     rom)              cmd_rom "$@" ;;
     new-disk)         cmd_new_disk "$@" ;;
     snapshot|snap)    cmd_snapshot "$@" ;;
+    update|upgrade)   cmd_update "$@" ;;
+    link)             cmd_link "$@" ;;
+    unlink)           cmd_unlink "$@" ;;
     help|-h|--help)   usage ;;
     *) printf 'unknown command: %s\n\n' "$cmd" >&2; usage >&2; exit 2 ;;
 esac

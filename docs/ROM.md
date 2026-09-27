@@ -26,10 +26,10 @@ ROM and copy it to the start of VRAM, where a real card's POST would shadow
 it:
 
 ```bash
-./ppcosx rom ~/radeon9700pro-mac.rom
-./ppcosx run                      # uses it automatically
-./ppcosx run --no-rom             # skip it for one boot
-./ppcosx rom --remove             # stop using it
+ppcosx rom ~/radeon9700pro-mac.rom
+ppcosx run                      # uses it automatically
+ppcosx run --no-rom             # skip it for one boot
+ppcosx rom --remove             # stop using it
 ```
 
 `ppcosx rom` checks the file first. It must:

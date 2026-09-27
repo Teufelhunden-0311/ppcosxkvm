@@ -1,21 +1,27 @@
 # Using ppcosx
 
-`ppcosx` is the one command for everything. Run it from the repo folder
-(`./ppcosx …`) or put the folder on your `PATH`.
+`ppcosx` is the one command for everything. The one-line installer puts it
+on your PATH. In a manual checkout, run `./ppcosx link` once, or type
+`./ppcosx`.
+
+**Shorthand:** a bare `ppcosx` boots the VM, and any run option works
+without the word `run`: `ppcosx --vga` is `ppcosx run --vga`.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `./ppcosx setup` | Install build dependencies and build QEMU. Safe to re-run; it updates the build after a `git pull`. |
-| `./ppcosx doctor` | Check the host, the build, the firmware checksums, your disk and ROM. |
-| `./ppcosx install <dvd> [--size 40G] [--disk PATH]` | Boot a Mac OS X install DVD image (`.iso` `.cdr` `.dmg` `.toast`) with an empty disk attached. See [GETTING-STARTED.md](GETTING-STARTED.md#3a-install-tiger-from-a-dvd-image). |
-| `./ppcosx import <image> [--as PATH] [--force]` | Copy an existing PowerPC OS X disk (`.qcow2` `.vmdk` `.vdi` `.vhd` `.img`, or a `.utm` bundle) to `vm/macosx.qcow2`. |
-| `./ppcosx run [options]` | Boot the disk with the emulated Radeon 9700 PRO. |
-| `./ppcosx run --vga` | Boot with a plain framebuffer and no Radeon: safe mode. |
-| `./ppcosx rom <file>` / `rom --remove` | Install or remove an optional Radeon 9700 PRO ROM ([ROM.md](ROM.md)). |
-| `./ppcosx new-disk [size] [path]` | Create an empty qcow2 disk (default 40G at `vm/macosx.qcow2`). |
-| `./ppcosx snapshot list \| save NAME \| restore NAME \| delete NAME` | Disk snapshots. The VM must be shut down. |
+| `ppcosx setup` | Install build dependencies and build QEMU. Safe to re-run; it updates the build after a `git pull`. |
+| `ppcosx doctor` | Check the host, the build, the firmware checksums, your disk and ROM. |
+| `ppcosx install <dvd> [--size 40G] [--disk PATH]` | Boot a Mac OS X install DVD image (`.iso` `.cdr` `.dmg` `.toast`) with an empty disk attached. See [GETTING-STARTED.md](GETTING-STARTED.md#3a-install-tiger-from-a-dvd-image). |
+| `ppcosx import <image> [--as PATH] [--force]` | Copy an existing PowerPC OS X disk (`.qcow2` `.vmdk` `.vdi` `.vhd` `.img`, or a `.utm` bundle) to `vm/macosx.qcow2`. |
+| `ppcosx` / `ppcosx run [options]` | Boot the disk with the emulated Radeon 9700 PRO. |
+| `ppcosx --vga` | Boot with a plain framebuffer and no Radeon: safe mode. |
+| `ppcosx update` | `git pull` the latest version and rebuild. Your VMs aren't touched. |
+| `ppcosx link` / `ppcosx unlink` | Add or remove the `ppcosx` command on your PATH. |
+| `ppcosx rom <file>` / `rom --remove` | Install or remove an optional Radeon 9700 PRO ROM ([ROM.md](ROM.md)). |
+| `ppcosx new-disk [size] [path]` | Create an empty qcow2 disk (default 40G at `vm/macosx.qcow2`). |
+| `ppcosx snapshot list \| save NAME \| restore NAME \| delete NAME` | Disk snapshots. The VM must be shut down. |
 
 ## `run` options
 
@@ -37,11 +43,11 @@
 Examples:
 
 ```bash
-./ppcosx run --ram 2048                       # more memory
-./ppcosx run --snapshot                       # try something risky
-./ppcosx run --cd ~/Discs/Photoshop7.iso      # install software from a disc image
-./ppcosx run --ssh-port 2222                  # then: ssh -p 2222 user@127.0.0.1
-./ppcosx run -- -serial stdio                 # extra QEMU flags
+ppcosx --ram 2048                           # more memory
+ppcosx --snapshot                           # try something risky
+ppcosx run --cd ~/Discs/Photoshop7.iso      # install software from a disc image
+ppcosx run --ssh-port 2222                  # then: ssh -p 2222 user@127.0.0.1
+ppcosx run -- -serial stdio                 # extra QEMU flags
 ```
 
 ## Keyboard and mouse
@@ -54,7 +60,9 @@ Examples:
 
 ## Files
 
-Everything that's yours lives in `vm/` (git ignores it). Set
+Everything that's yours lives in the `vm/` folder of the install:
+`~/.ppcosx/vm/` with the one-line installer (git ignores it, so updates
+never touch it). `ppcosx help` prints the exact path. Set
 `PPCOSX_VM_DIR=/some/other/folder` to keep it elsewhere, e.g. on an external
 drive.
 
@@ -70,13 +78,13 @@ drive.
 qcow2 disks can hold snapshots of themselves. With the VM **shut down**:
 
 ```bash
-./ppcosx snapshot save before-update
-./ppcosx snapshot list
-./ppcosx snapshot restore before-update    # the disk goes back to that moment
-./ppcosx snapshot delete before-update
+ppcosx snapshot save before-update
+ppcosx snapshot list
+ppcosx snapshot restore before-update    # the disk goes back to that moment
+ppcosx snapshot delete before-update
 ```
 
-For a one-off experiment, `./ppcosx run --snapshot` is simpler: nothing is
+For a one-off experiment, `ppcosx run --snapshot` is simpler: nothing is
 written to the disk at all.
 
 ## Getting files in and out
@@ -90,4 +98,4 @@ written to the disk at all.
   Tiger's OpenSSH is old; from a modern Mac you may need
   `ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -p 2222 user@127.0.0.1`.
 * **Disc images**: `hdiutil makehybrid -hfs -iso -o files.iso some-folder/`
-  on the Mac, then `./ppcosx run --cd files.iso`.
+  on the Mac, then `ppcosx run --cd files.iso`.
