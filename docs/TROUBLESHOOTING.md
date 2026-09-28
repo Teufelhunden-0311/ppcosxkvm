@@ -25,9 +25,17 @@ QEMU fork failed. Check your network, then run
 **The DVD doesn't boot (you see an Open Firmware prompt `0 >`, or the
 window stays black).**
 
-* Make sure it's a **PowerPC** Mac OS X DVD: 10.4 retail or 10.4
-  Universal. Intel-only 10.4 DVDs (the grey ones from 2006 Intel Macs)
-  won't boot.
+* Make sure it's a **PowerPC** Mac OS X DVD: 10.4 retail, 10.4
+  Universal, or 10.5 retail. Intel-only 10.4 DVDs (the grey ones from 2006
+  Intel Macs) won't boot.
+* "No valid state has been set by load or init-program" at the `0 >`
+  prompt: the image is a bare HFS+ volume with no partition map, which
+  OpenBIOS can't boot (the Leopard retail DVD image is one). `ppcosx
+  install` and `--attach-dvd` add one automatically; if you boot the image
+  some other way, run `tools/apm-wrap.py wrap in.cdr out.cdr` first.
+* The `0 >` prompt ignores the keyboard: OpenBIOS only reads an ADB
+  keyboard, and ppcosx gives the guest USB ones. For Forth at the prompt,
+  pass `-- -machine via=pmu-adb`, which adds an ADB keyboard and mouse.
 * Some `.dmg` or `.toast` files are compressed or multi-session in ways QEMU
   can't read. Convert on the Mac:
   `hdiutil convert Tiger.dmg -format UDTO -o Tiger` gives `Tiger.cdr`.
@@ -49,11 +57,15 @@ to see where it stops. Then try `ppcosx run --vga`:
   issue with the last lines of the verbose boot and `vm/gpu-trace.log`.
 * if `--vga` doesn't boot either, it's the disk or the OS install.
 
-**Kernel panic mentioning `ATIRadeon9700`.** On 10.4.0 (the original DVD,
-build 8A428) this is expected: boot with `--vga` and install the 10.4.11
-Combo Update (see [GETTING-STARTED.md](GETTING-STARTED.md#4-boot)). On
-10.4.11, please report it with a photo or screenshot of the panic text. As
-a workaround, `--vga` still boots.
+**Kernel panic mentioning `ATIRadeon9700`** (a 0x300 data access at a
+DAR like 0x4018 or 0xE40). The ATI kext couldn't map the Radeon's register
+BAR, and its cleanup code then touched the unmapped registers. Check
+`ppcosx doctor` reports the firmware checksums OK: an older
+`firmware/radeon/openbios-ppc` advertises a PCI memory window too small
+for the Radeon's BARs, which 10.4.0 and Leopard reject (see
+[HOW-IT-WORKS.md](HOW-IT-WORKS.md#limitations)). Otherwise please report
+it with a photo or screenshot of the panic text and your Mac OS X version.
+As a workaround, `--vga` still boots.
 
 **`a VM is already running on macosx.qcow2`.** Two VMs writing one disk
 would corrupt it, so QEMU locks the disk while a VM uses it. Shut the

@@ -33,8 +33,8 @@ Mac with `--gpuvulkan`).
   **[Homebrew](https://brew.sh)** (the installer tells you if it's missing),
   **or** a Linux PC with a Vulkan GPU driver and `git` (Debian/Ubuntu,
   Fedora or Arch: the installer gets the rest with `sudo`)
-* 💿 **Mac OS X Tiger for PowerPC**, which you provide yourself. Either:
-  * a Tiger **install DVD image** (`.iso`, `.dmg`, `.cdr` or `.toast`), or
+* 💿 **Mac OS X Tiger (or Leopard) for PowerPC**, which you provide yourself. Either:
+  * a Tiger or Leopard **install DVD image** (`.iso`, `.dmg`, `.cdr` or `.toast`), or
   * a Tiger **disk you already have** from another emulator, such as UTM,
     VMware, VirtualBox or a raw image
 * 📦 About **25 GB** of free disk space
@@ -131,14 +131,16 @@ Other handy ways to start it:
 
 ## Status
 
-Tested on **Mac OS X 10.4.11**. For the best results, update Tiger to
-10.4.11 with Apple's *10.4.11 Combo Update (PPC)*.
+Tested on **Mac OS X 10.4.11** and **10.5.8**. For the best results,
+update Tiger to 10.4.11 with Apple's *10.4.11 Combo Update (PPC)*, or
+Leopard to 10.5.8 with the *10.5.8 Combo Update*.
 
 | | |
 |---|---|
 | ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess, Quake III Arena), QuickTime video, Aperture 1.5, hardware cursor, keyboard and mouse |
 | 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (built and set up on Ubuntu 24.04; not yet run on a Linux GPU) |
-| ❌ Not yet | Leopard (10.5), multiple CPUs, video decode acceleration |
+| ✅ Leopard | 10.5.8 with Quartz Extreme, Core Image and OpenGL (Chess); installs from the retail DVD image |
+| ❌ Not yet | Multiple CPUs, video decode acceleration |
 
 ## More documentation
 

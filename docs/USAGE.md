@@ -76,7 +76,7 @@ drive.
 | `vm/macosx.qcow2` | The guest disk. Grows as it's used. |
 | `vm/roms/radeon9700.rom` | Optional ROM, installed by `ppcosx rom`. |
 | `vm/gpu-trace.log` | GPU log, rewritten on each boot: first-use notices for 3D features, the texture formats seen, and while the GPU is busy a `rate:` line (draws, 2D operations, flushes a second) and a `ring:` line (command submissions a second). See [DEVELOPING.md](DEVELOPING.md#profiling). |
-| `vm/dvd-*.cdr` | Raw copies of `.dmg` disc images, made by `--attach-dvd` and `ppcosx install`. Safe to delete; they're remade when needed. |
+| `vm/dvd-*.cdr` | Raw copies of `.dmg` disc images, and partition-mapped copies of bare HFS+ images (the Leopard retail DVD), made by `--attach-dvd` and `ppcosx install`. Safe to delete; they're remade when needed. |
 
 ## Environment variables
 

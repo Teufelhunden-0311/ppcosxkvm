@@ -628,6 +628,20 @@ dvd_image() {
             DVD_PATH="$cdr" ;;
         *) DVD_PATH="$src" ;;
     esac
+    # A retail Leopard DVD image is one bare HFS+ volume.  OpenBIOS only boots
+    # a disc whose volume is in an Apple_HFS partition (as on Tiger's DVD), so
+    # give such an image a partition map, once.
+    if /usr/bin/python3 "$REPO/tools/apm-wrap.py" check "$DVD_PATH"; then
+        cdr="$VM_DIR/dvd-$(basename "${src%.*}").cdr"
+        if [ "$DVD_PATH" = "$cdr" ] || [ ! -f "$cdr" ] || [ "$src" -nt "$cdr" ]; then
+            say "Adding a partition map to $(basename "$src") so OpenBIOS can boot it (one time)"
+            mkdir -p "$VM_DIR"
+            /usr/bin/python3 "$REPO/tools/apm-wrap.py" wrap "$DVD_PATH" "$cdr.part" \
+                && mv -f "$cdr.part" "$cdr" \
+                || { rm -f "$cdr.part"; die "could not add a partition map to $src"; }
+        fi
+        DVD_PATH="$cdr"
+    fi
 }
 
 # ------------------------------------------------------------------- run ---
