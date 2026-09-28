@@ -291,7 +291,15 @@ setup_build() {
     if ! "$venv/bin/python3" -c 'import distlib' >/dev/null 2>&1; then
         say "Preparing a Python environment for the build"
         rm -rf "$venv"
-        python3 -m venv "$venv" && "$venv/bin/python3" -m pip install -q distlib \
+        # On macOS, build the venv from Homebrew's own python3, not whatever
+        # is first on PATH: a python3 left over from an Intel Homebrew runs
+        # under Rosetta and makes meson configure an x86_64 build, which then
+        # fails on -mcx16/-msse2.
+        local py=python3
+        if [ "$HOST_OS" = Darwin ] && [ -x "$(brew --prefix)/opt/python@3/libexec/bin/python3" ]; then
+            py="$(brew --prefix)/opt/python@3/libexec/bin/python3"
+        fi
+        "$py" -m venv "$venv" && "$venv/bin/python3" -m pip install -q distlib \
             || die "could not create the Python venv in .pyvenv (python3 -m venv / pip failed)"
     fi
     ok "Python $("$venv/bin/python3" -c 'import platform; print(platform.python_version())') with distlib"
@@ -548,7 +556,7 @@ build_common() {   # $1 = disk, $2 = "cd" when booting from CD
         -device "ide-hd,bus=ide.0,unit=0,drive=hd$hdboot")
     [ "$SNAPSHOT" = 1 ] && QARGS+=(-snapshot)
     if [ "$MONITOR" = 1 ]; then
-        port_free 4444 || die "port 4444 is in use (another VM running?)"
+        port_free 4444 && port_free 4445 || die "port 4444 or 4445 is in use (another VM running?)"
         QARGS+=(-monitor tcp:127.0.0.1:4444,server,nowait -qmp tcp:127.0.0.1:4445,server,nowait)
     fi
 }
@@ -663,7 +671,8 @@ cmd_run() {
             -device ich9-usb-uhci1,masterbus=usb-controller-0.0,firstport=0,multifunction=on
             -device ich9-usb-uhci2,masterbus=usb-controller-0.0,firstport=2,multifunction=on
             -device ich9-usb-uhci3,masterbus=usb-controller-0.0,firstport=4,multifunction=on
-            -device virtio-tablet-pci)
+            -device virtio-tablet-pci
+            -device usb-tablet,bus=usb-bus.0)   # absolute pointer for tools/vmctl.py
         say "Booting ${DISK#$REPO/} with the plain VGA framebuffer (no 3D)"
     else
         # The Radeon is pinned to PCI slot $RADEON_SLOT so the node path below
@@ -721,7 +730,7 @@ cmd_install() {
         case "$1" in
             --size) size="$2"; shift ;;
             --disk|--ram|--res|--cpu-mhz) args+=("$1" "$2"); shift ;;
-            --verbose|-v) args+=("$1") ;;
+            --verbose|-v|--monitor) args+=("$1") ;;
             -*) die "unknown option $1" ;;
             *) iso=$(abspath "$1") ;;
         esac
@@ -750,7 +759,8 @@ cmd_install() {
         -drive "if=none,media=cdrom,id=cd,readonly=on,file=$iso"
         -device ide-cd,bus=ide.1,unit=0,drive=cd,bootindex=0
         -boot d -no-reboot
-        -usb -device usb-mouse,bus=usb-bus.0 -device usb-kbd,bus=usb-bus.0)
+        -usb -device usb-mouse,bus=usb-bus.0 -device usb-kbd,bus=usb-bus.0
+        -device usb-tablet,bus=usb-bus.0)   # absolute pointer for tools/vmctl.py
     [ "$VERBOSE" = 1 ] && QARGS+=(-prom-env 'boot-args=-v')
     add_net
 

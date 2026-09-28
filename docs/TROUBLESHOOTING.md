@@ -49,9 +49,11 @@ to see where it stops. Then try `ppcosx run --vga`:
   issue with the last lines of the verbose boot and `vm/gpu-trace.log`.
 * if `--vga` doesn't boot either, it's the disk or the OS install.
 
-**Kernel panic mentioning `ATIRadeon9700`.** Please report it with a photo
-or screenshot of the panic text and your Tiger version. As a workaround,
-`--vga` still boots.
+**Kernel panic mentioning `ATIRadeon9700`.** On 10.4.0 (the original DVD,
+build 8A428) this is expected: boot with `--vga` and install the 10.4.11
+Combo Update (see [GETTING-STARTED.md](GETTING-STARTED.md#4-boot)). On
+10.4.11, please report it with a photo or screenshot of the panic text. As
+a workaround, `--vga` still boots.
 
 **`a VM is already running on macosx.qcow2`.** Two VMs writing one disk
 would corrupt it, so QEMU locks the disk while a VM uses it. Shut the
