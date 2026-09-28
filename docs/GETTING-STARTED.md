@@ -53,6 +53,25 @@ version and rebuilds what changed. `ppcosx unlink` removes the command, and
 deleting `~/.ppcosx` removes everything, **including your VMs in
 `~/.ppcosx/vm`**, so copy those out first.
 
+### On Linux
+
+The same one-liner works on Linux (x86_64 or ARM64; needs `git`, `curl`
+and a GPU with a Vulkan driver). `setup` then:
+
+1. installs what's missing with `apt`, `dnf` or `pacman` (it asks for your
+   password): GTK, PulseAudio, the Vulkan loader and Mesa's drivers,
+   shaderc and SPIRV-Cross;
+2. downloads a **prebuilt QEMU** made for exactly this version (a GitHub
+   release named `qemu-<commit>`) into `~/.ppcosx/prebuilt`, and checks
+   it runs on your system;
+3. if there's no prebuilt QEMU yet (right after an update, for a few
+   minutes while it's built), or it doesn't run, installs the build tools
+   and compiles QEMU instead. `ppcosx setup --build` always compiles.
+
+`setup` reports the Vulkan GPU it found. Without one the Radeon can't
+draw; use `--vga` in that case. On Linux the Radeon always renders with
+Vulkan, and **Ctrl+Alt+G** releases the mouse.
+
 ### Manual install (for development)
 
 ```bash

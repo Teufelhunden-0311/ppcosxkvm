@@ -77,7 +77,27 @@ VRAM, so it's twice `--vram`: 256 MB at the default 128.
 **Slow.** It's a whole PowerPC Mac interpreted in software on one host
 core. Things that help: close apps you don't need in the guest, give it
 `--ram 1536` or more, and turn off Spotlight indexing
-(`sudo mdutil -i off /` in the guest's Terminal).
+(`sudo mdutil -i off /` in the guest's Terminal). Video and other AltiVec
+code is much faster on an Apple Silicon or other ARM64 host than on x86
+Linux, where the AltiVec speed-ups don't apply.
+
+**Graphics glitches, or a 3D app that hangs, that didn't happen before an
+update.** The Radeon's command processor now runs on its own thread, in
+parallel with the guest. To rule that out, run it the old way:
+
+```bash
+PPCGPU_CP_SYNC=1 ppcosx run
+```
+
+If that fixes it, please open an issue saying so, with the app and
+`vm/gpu-trace.log`. `PPCGPU_ASYNC_FENCE=0` (fences completed at once)
+and `R300_SYNC=1` (no draw batching) narrow things down further.
+
+**Video or an app looks wrong only on the Radeon, or a filter computes
+wrong numbers.** The AltiVec instructions translated to NEON are checked
+by `qemu/tests/ppc-vmx/run.py`. If you find a program that computes
+differently here than on a real Mac, please report it with the program
+and what it does.
 
 **The mouse pointer and the guest's cursor don't line up.** Release and
 re-capture the mouse (Ctrl+Option+G, then click). In the Radeon mode the
@@ -94,4 +114,5 @@ Please include:
 * the output of `ppcosx doctor`,
 * the exact `ppcosx` command,
 * your Tiger version (Apple menu → About This Mac),
-* `vm/gpu-trace.log` for graphics problems, and a screenshot.
+* `vm/gpu-trace.log` for graphics problems, and a screenshot,
+* whether `PPCGPU_CP_SYNC=1` changes anything, for graphics problems.

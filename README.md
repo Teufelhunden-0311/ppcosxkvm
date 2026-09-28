@@ -110,7 +110,11 @@ Other handy ways to start it:
   `ppcosx snapshot save my-backup`, and later
   `ppcosx snapshot restore my-backup`.
 * 🐢 **Speed:** the whole PowerPC processor is emulated in software, so
-  expect roughly a G4-era Mac. The graphics are fast, heavy apps are not.
+  expect roughly a G4-era Mac. The graphics are fast and run in parallel
+  with the emulated processor, like a real graphics card, and on Apple
+  Silicon the G4's AltiVec vector instructions (used by QuickTime and
+  Core Image) run as the host's NEON instructions. Heavy apps are still
+  bound by the emulated CPU.
 * 📁 **Your files** (the Mac OS X disk and settings) live in `~/.ppcosx/vm`.
 * ✅ **Is 3D really working?** In Mac OS X, open Apple menu → About This Mac →
   More Info → Graphics/Displays. It should say **ATI Radeon 9700 Pro**, with
@@ -132,7 +136,7 @@ Tested on **Mac OS X 10.4.11**. For the best results, update Tiger to
 
 | | |
 |---|---|
-| ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess), hardware cursor, keyboard and mouse |
+| ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess, Quake III Arena), QuickTime video, Aperture 1.5, hardware cursor, keyboard and mouse |
 | 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (built and set up on Ubuntu 24.04; not yet run on a Linux GPU) |
 | ❌ Not yet | Leopard (10.5), multiple CPUs, video decode acceleration |
 
@@ -142,8 +146,8 @@ Tested on **Mac OS X 10.4.11**. For the best results, update Tiger to
 * 🧰 [Using ppcosx](docs/USAGE.md): every command and option, moving files in and out
 * 🩺 [Troubleshooting](docs/TROUBLESHOOTING.md)
 * 🔌 [The ATI ROM](docs/ROM.md): optional, and why
-* 🔬 [How it works](docs/HOW-IT-WORKS.md): the emulated Radeon and the Metal/Vulkan translation
-* 🛠️ [Developing](docs/DEVELOPING.md): building from source, debug switches, tests
+* 🔬 [How it works](docs/HOW-IT-WORKS.md): the emulated Radeon, the Metal/Vulkan translation, and how the emulated CPU is kept fast
+* 🛠️ [Developing](docs/DEVELOPING.md): building from source, debug switches, profiling, tests
 
 ## Legal
 

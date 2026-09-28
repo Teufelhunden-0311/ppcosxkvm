@@ -11,9 +11,9 @@ without the word `run`: `ppcosx --vga` is `ppcosx run --vga`.
 
 | Command | What it does |
 |---|---|
-| `ppcosx setup` | Install build dependencies and build QEMU. Safe to re-run; it updates the build after a `git pull`. |
+| `ppcosx setup [--build]` | Install what's needed and build QEMU. Safe to re-run; it updates the build after a `git pull`. On Linux it downloads a prebuilt QEMU for this version when there is one; `--build` compiles instead. |
 | `ppcosx doctor` | Check the host, the build, the firmware checksums, your disk and ROM. |
-| `ppcosx install <dvd> [--size 40G] [--disk PATH] [--monitor]` | Boot a Mac OS X install DVD image (`.iso` `.cdr` `.dmg` `.toast`) with an empty disk attached. See [GETTING-STARTED.md](GETTING-STARTED.md#3a-install-tiger-from-a-dvd-image). |
+| `ppcosx install <dvd> [--size 40G] [--disk PATH] [--ram MB] [--res WxH] [--cpu-mhz N] [--verbose] [--monitor]` | Boot a Mac OS X install DVD image (`.iso` `.cdr` `.dmg` `.toast`) with an empty disk attached. See [GETTING-STARTED.md](GETTING-STARTED.md#3a-install-tiger-from-a-dvd-image). |
 | `ppcosx import <image> [--as PATH] [--force]` | Copy an existing PowerPC OS X disk (`.qcow2` `.vmdk` `.vdi` `.vhd` `.img`, or a `.utm` bundle) to `vm/macosx.qcow2`. |
 | `ppcosx` / `ppcosx run [options]` | Boot the disk with the emulated Radeon 9700 PRO. |
 | `ppcosx --vga` | Boot with a plain framebuffer and no Radeon: safe mode. |
@@ -34,8 +34,9 @@ without the word `run`: `ppcosx --vga` is `ppcosx run --vga`.
 | `--vram MB` | 128 | Radeon video memory: 64, 128 or 256. The real 9700 PRO has 128. |
 | `--res WxH` | 1024x768 | Initial screen size. The Radeon mode is tested at 1024×768; other sizes are experimental. |
 | `--rom PATH` / `--no-rom` | `vm/roms/radeon9700.rom` if present | Radeon option ROM. |
+| `--gpu metal\|vulkan` (or `--gpumetal`, `--gpuvulkan`) | Metal on macOS, Vulkan on Linux | Host 3D API for the Radeon. On a Mac, Vulkan runs through MoltenVK. Asking for one the host can't provide stops with the reason. |
 | `--attach-dvd IMG` (or `--dvd`, `--cd`) | | Insert a DVD/CD image (`.iso` `.cdr` `.dmg` `.toast`), e.g. to install software from a disc. A `.dmg` is converted once to a raw `.cdr` in the VM folder (QEMU can't read compressed `.dmg`s). |
-| `--verbose` | off | Text-mode ("verbose") boot instead of the grey Apple. Good for diagnosing hangs. |
+| `--verbose` (or `-v`) | off | Text-mode ("verbose") boot instead of the grey Apple. Good for diagnosing hangs. |
 | `--snapshot` | off | Throwaway session: all disk writes are discarded when QEMU exits. The disk must not be in use by another VM. |
 | `--ssh-port N` | | Forward `127.0.0.1:N` on the host to the guest's SSH (turn on *Remote Login* in the guest's Sharing preferences). |
 | `--monitor` | off | QEMU's monitor on `127.0.0.1:4444` (HMP) and `:4445` (QMP), for `tools/vmctl.py` and scripting. |
@@ -59,6 +60,8 @@ ppcosx run -- -serial stdio                 # extra QEMU flags
   QEMU instead of the guest. Use the guest's menus if in doubt.
 * In the Radeon mode the pointer is an absolute USB tablet plus a
   hardware cursor drawn by the emulated card.
+* On Linux the window is GTK (zoomed to fit), sound goes to PulseAudio
+  (or PipeWire's PulseAudio server), and **Ctrl+Alt+G** releases the mouse.
 
 ## Files
 
@@ -72,8 +75,31 @@ drive.
 |---|---|
 | `vm/macosx.qcow2` | The guest disk. Grows as it's used. |
 | `vm/roms/radeon9700.rom` | Optional ROM, installed by `ppcosx rom`. |
-| `vm/gpu-trace.log` | GPU log: first-use notices for 3D features and the texture formats seen. Rewritten on each boot. |
+| `vm/gpu-trace.log` | GPU log, rewritten on each boot: first-use notices for 3D features, the texture formats seen, and while the GPU is busy a `rate:` line (draws, 2D operations, flushes a second) and a `ring:` line (command submissions a second). See [DEVELOPING.md](DEVELOPING.md#profiling). |
 | `vm/dvd-*.cdr` | Raw copies of `.dmg` disc images, made by `--attach-dvd` and `ppcosx install`. Safe to delete; they're remade when needed. |
+
+## Environment variables
+
+Defaults you can set once in your shell profile instead of on every run:
+
+| Variable | Meaning |
+|---|---|
+| `PPCOSX_VM_DIR` | Where disks, ROM and logs live (default: the `vm/` folder of the install). |
+| `PPCOSX_GPU` | `metal` or `vulkan`, like `--gpu`. |
+| `PPCOSX_CPU_MHZ` | Like `--cpu-mhz`. |
+| `PPCOSX_MODEL` | Like `--model`. |
+| `PPCOSX_QEMU` | A different `qemu-system-ppc` to run (e.g. your own build). |
+
+For the installer (`install.sh`): `PPCOSX_HOME` (where to install,
+default `~/.ppcosx`), `PPCOSX_BRANCH` (default `main`) and `PPCOSX_REPO`
+(install from a fork). For Linux setup: `PPCOSX_RELEASES` (the GitHub
+`owner/repo` to download the prebuilt QEMU from) and
+`PPCOSX_QEMU_TARBALL` (use a local prebuilt tarball instead of
+downloading one).
+
+The emulated Radeon also reads debug and fallback switches (such as
+`PPCGPU_CP_SYNC=1`); those are listed in
+[DEVELOPING.md](DEVELOPING.md#debug-switches).
 
 ## Snapshots
 
