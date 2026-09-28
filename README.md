@@ -139,7 +139,7 @@ Leopard to 10.5.8 with the *10.5.8 Combo Update*.
 |---|---|
 | ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess, Quake III Arena), QuickTime video, Aperture 1.5, hardware cursor, keyboard and mouse |
 | 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (built and set up on Ubuntu 24.04; not yet run on a Linux GPU) |
-| ✅ Leopard | 10.5.8 with Quartz Extreme, Core Image and OpenGL (Chess); installs from the retail DVD image |
+| ✅ Leopard | 10.5 to 10.5.8 with Quartz Extreme, Core Image and OpenGL (Chess); installs from the retail DVD image, or upgrades a Tiger disk |
 | ❌ Not yet | Multiple CPUs, video decode acceleration |
 
 ## More documentation

@@ -263,8 +263,9 @@ references in a bare-metal guest and times them (see
 * **VRAM in System Profiler** shows the size of the VRAM BAR, which
   holds two apertures onto VRAM: twice `--vram`, so 256 MB at the
   default 128.
-* **Leopard** (10.5.8) works: the ATI 5.4.8 kext gives Quartz Extreme,
-  Core Image and OpenGL (tested with Chess). It needed one firmware fix.
+* **Leopard** works, from 10.5 (a fresh install, or an upgrade of a Tiger
+  disk) through 10.5.8: the ATI kext gives Quartz Extreme, Core Image and
+  OpenGL (tested with Chess). It needed one firmware fix.
   QEMU's mac99 PCI hole is 1 GB, and OpenBIOS assigns the Radeon's VRAM
   and register BARs above 0x90000000, but its PCI host `ranges` property
   advertised only 256 MB (0x80000000-0x8fffffff). Tiger's PCI family
