@@ -248,6 +248,7 @@ ${B}Run options${N} (for "ppcosx", "ppcosx run" and "ppcosx install")
   --attach-dvd IMG DVD/CD image to insert: .iso .cdr .dmg .toast (also --dvd)
   --verbose        verbose (text) boot instead of the grey Apple
   --snapshot       throw away all disk writes when the VM quits
+  --no-audio       no sound (Mac OS X runs normally, nothing reaches your speakers)
   --ssh-port N     forward host 127.0.0.1:N to guest port 22
   --monitor        QEMU monitor on 127.0.0.1:4444 (HMP) and :4445 (QMP)
   --trace-gpu      log every GPU register access to vm/gpu-trace.log (slow)
@@ -707,8 +708,13 @@ dvd_image() {
 # Shared by run and install.  Sets the global array QARGS.
 build_common() {   # $1 = disk, $2 = "cd" when booting from CD
     local HOST_UI
-    if [ "$IS_MAC" = 1 ]; then HOST_UI=(-display cocoa -audio coreaudio)
-    else HOST_UI=(-display gtk,zoom-to-fit=on -audio pa); fi
+    local AUDIO
+    if [ "$IS_MAC" = 1 ]; then AUDIO=coreaudio; HOST_UI=(-display cocoa)
+    else AUDIO=pa; HOST_UI=(-display gtk,zoom-to-fit=on); fi
+    # --no-audio: the Mac still has its sound chip, but nothing reaches
+    # the host's audio system (for hosts where that misbehaves).
+    [ "$NO_AUDIO" = 1 ] && AUDIO=none
+    HOST_UI+=(-audio "$AUDIO")
     # cpu-mhz is a machine option of this repo's QEMU; an older build
     # (git pull without ppcosx update) doesn't have it yet.
     MACHINE="mac99,via=pmu"
@@ -760,6 +766,7 @@ parse_run_opts() {
     DISK="$DISK_DEFAULT"; RAM=1024; VRAM=128; RES=1024x768; ROM=; CD=
     CPU_MHZ="${PPCOSX_CPU_MHZ:-$CPU_MHZ_DEFAULT}"; MODEL="${PPCOSX_MODEL:-$MODEL_DEFAULT}"
     VERBOSE=0; SNAPSHOT=0; SSH_PORT=; MONITOR=0; TRACE=0; MODE=radeon
+    NO_AUDIO="${PPCOSX_NO_AUDIO:-0}"
     GPU="${PPCOSX_GPU:-}"
     [ -n "$GPU" ] || { apple_silicon && GPU=metal || GPU=vulkan; }
     EXTRA=()
@@ -785,6 +792,7 @@ parse_run_opts() {
             --gpu=*) GPU="${1#--gpu=}" ;;
             --verbose|-v) VERBOSE=1 ;;
             --snapshot) SNAPSHOT=1 ;;
+            --no-audio) NO_AUDIO=1 ;;
             --ssh-port) SSH_PORT="$2"; shift ;;
             --monitor) MONITOR=1 ;;
             --trace-gpu) TRACE=1 ;;

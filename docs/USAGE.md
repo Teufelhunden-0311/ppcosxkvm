@@ -38,6 +38,7 @@ without the word `run`: `ppcosx --vga` is `ppcosx run --vga`.
 | `--attach-dvd IMG` (or `--dvd`, `--cd`) | | Insert a DVD/CD image (`.iso` `.cdr` `.dmg` `.toast`), e.g. to install software from a disc. A `.dmg` is converted once to a raw `.cdr` in the VM folder (QEMU can't read compressed `.dmg`s). |
 | `--verbose` (or `-v`) | off | Text-mode ("verbose") boot instead of the grey Apple. Good for diagnosing hangs. |
 | `--snapshot` | off | Throwaway session: all disk writes are discarded when QEMU exits. The disk must not be in use by another VM. |
+| `--no-audio` | off | No sound: the guest keeps its sound hardware, but QEMU uses no host audio backend (`-audio none`). For hosts where CoreAudio or PulseAudio misbehaves. `PPCOSX_NO_AUDIO=1` sets it by default. |
 | `--ssh-port N` | | Forward `127.0.0.1:N` on the host to the guest's SSH (turn on *Remote Login* in the guest's Sharing preferences). |
 | `--monitor` | off | QEMU's monitor on `127.0.0.1:4444` (HMP) and `:4445` (QMP), for `tools/vmctl.py` and scripting. |
 | `--trace-gpu` | off | Log every GPU register access to `vm/gpu-trace.log`. Very slow; for debugging only. |

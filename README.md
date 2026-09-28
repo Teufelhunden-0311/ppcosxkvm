@@ -95,6 +95,7 @@ Other handy ways to start it:
 | `ppcosx --cpu-mhz 2500` | Change the CPU speed Mac OS X sees (default 2 GHz); it doesn't make it faster |
 | `ppcosx --model PowerBook6,8` | Change the Mac model Mac OS X sees (default: a PowerBook G4, so Aperture runs) |
 | `ppcosx --snapshot` | Try something risky: nothing you do is saved |
+| `ppcosx --no-audio` | Start without sound, if audio crashes or misbehaves on your Mac |
 | `ppcosx doctor` | Check that everything is set up correctly |
 | `ppcosx update` | Get the latest version |
 | `ppcosx help` | See every command and option |
