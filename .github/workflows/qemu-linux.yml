@@ -1,0 +1,60 @@
+# Builds the prebuilt QEMU that "ppcosx setup" downloads on Linux, for the
+# qemu/ commit this repository pins, and attaches it to the release
+# "qemu-<first 12 characters of that commit>".
+name: Linux QEMU
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - qemu
+      - tools/build-linux-qemu.sh
+      - .github/workflows/qemu-linux.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build pkg-config python3 \
+            python3-venv flex bison libglib2.0-dev libpixman-1-dev libslirp-dev \
+            libgtk-3-dev libpulse-dev libvulkan-dev libshaderc-dev \
+            libspirv-cross-c-shared-dev
+
+      - name: Build
+        run: tools/build-linux-qemu.sh "ppcosx-qemu-linux-${{ matrix.arch }}.tar.xz"
+
+      - name: Smoke test
+        run: |
+          tar -xJf "ppcosx-qemu-linux-${{ matrix.arch }}.tar.xz"
+          ppcosx-qemu/bin/qemu-system-ppc -device help | grep -q ati-radeon-9700
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="qemu-$(git rev-parse HEAD:qemu | cut -c1-12)"
+          gh release view "$tag" >/dev/null 2>&1 ||
+            gh release create "$tag" --latest=false \
+              --title "Prebuilt QEMU for Linux ($tag)" \
+              --notes "qemu-system-ppc and qemu-img for ppcosx on Linux (Ubuntu 24.04 or newer, x86_64 and arm64), built from the pinned qemu/ commit. ppcosx setup downloads these; you don't need to." ||
+            true
+          gh release upload "$tag" "ppcosx-qemu-linux-${{ matrix.arch }}.tar.xz" --clobber

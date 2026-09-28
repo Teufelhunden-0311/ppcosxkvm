@@ -28,8 +28,19 @@ fi
 VM_DIR="${PPCOSX_VM_DIR:-$REPO/vm}"
 QEMU_DIR="$REPO/qemu"
 QEMU_BUILD="$QEMU_DIR/build"
-QEMU="${PPCOSX_QEMU:-$QEMU_BUILD/qemu-system-ppc}"
-QEMU_IMG_BUILT="$QEMU_BUILD/qemu-img"
+# Linux can use a prebuilt QEMU (GitHub release "qemu-<commit>", made by
+# tools/build-linux-qemu.sh); "ppcosx setup" downloads it into prebuilt/.
+PREBUILT_DIR="$REPO/prebuilt"
+PREBUILT_REPO="${PPCOSX_RELEASES:-linuxkid473/ppcosxkvm}"
+if [ -z "${PPCOSX_QEMU:-}" ] && [ -x "$PREBUILT_DIR/bin/qemu-system-ppc" ]; then
+    QEMU="$PREBUILT_DIR/bin/qemu-system-ppc"
+    QEMU_IMG_BUILT="$PREBUILT_DIR/bin/qemu-img"
+    QEMU_DATA="$PREBUILT_DIR/share/pc-bios"
+else
+    QEMU="${PPCOSX_QEMU:-$QEMU_BUILD/qemu-system-ppc}"
+    QEMU_IMG_BUILT="$QEMU_BUILD/qemu-img"
+    QEMU_DATA="$QEMU_DIR/pc-bios"
+fi
 FW_RADEON="$REPO/firmware/radeon"
 FW_VGA="$REPO/firmware/vga"
 DISK_DEFAULT="$VM_DIR/macosx.qcow2"
@@ -44,6 +55,10 @@ BREW_DEPS="ninja pkgconf glib pixman libslirp shaderc spirv-cross glslang vulkan
 # Linux build and run dependencies, per package manager: QEMU's (glib,
 # pixman, slirp, GTK display, PulseAudio/PipeWire sound), the Vulkan
 # loader and a driver, and the shader toolchain (shaderc, SPIRV-Cross).
+# What a prebuilt QEMU needs at run time (Ubuntu 24.04 / Debian 13 names).
+APT_RUNTIME_DEPS="git curl ca-certificates xz-utils python3 libglib2.0-0t64
+    libpixman-1-0 libslirp0 libgtk-3-0t64 libpulse0 libvulkan1
+    mesa-vulkan-drivers libshaderc1 libspirv-cross-c-shared0"
 APT_DEPS="build-essential git ninja-build pkg-config python3 python3-venv flex bison
     libglib2.0-dev libpixman-1-dev libslirp-dev libgtk-3-dev libpulse-dev
     libvulkan-dev mesa-vulkan-drivers libshaderc-dev libspirv-cross-c-shared-dev
@@ -125,9 +140,9 @@ linux_deps() {   # the package list for $1
     esac
 }
 
-linux_missing() {   # packages of $1's list that aren't installed
-    local pm="$1" p missing=
-    for p in $(linux_deps "$pm"); do
+linux_missing() {   # packages of $1's list (or of list $2) that aren't installed
+    local pm="$1" p missing= list="${2:-$(linux_deps "$1")}"
+    for p in $list; do
         case "$pm" in
             apt) dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "ok installed" ;;
             dnf) rpm -q "$p" >/dev/null 2>&1 ;;
@@ -164,7 +179,8 @@ ${B}Disks${N}
 
 ${B}Maintenance${N}
   ppcosx update                get the latest version and rebuild
-  ppcosx setup                 install build tools and (re)build QEMU
+  ppcosx setup [--build]       install what's needed and (re)build QEMU (Linux:
+                               downloads a prebuilt QEMU; --build compiles it)
   ppcosx link | unlink         add or remove the 'ppcosx' command on your PATH
 
 ${B}Run options${N} (for "ppcosx", "ppcosx run" and "ppcosx install")
@@ -199,38 +215,112 @@ EOF
 
 # ----------------------------------------------------------------- setup ---
 cmd_setup() {
+    local build=0
+    case "${1:-}" in
+        --build) build=1 ;;
+        '') ;;
+        *) die "usage: $PROG setup [--build]" ;;
+    esac
     if [ "$IS_MAC" = 1 ]; then
         setup_mac
     elif [ "$HOST_OS" = Linux ]; then
+        # A prebuilt QEMU when there is one for this version, else build.
+        if [ "$build" = 0 ] && setup_linux_prebuilt; then
+            setup_done
+            return 0
+        fi
         setup_linux
     else
         die "ppcosx runs on macOS and Linux only (this is $HOST_OS)"
     fi
+    rm -rf "$PREBUILT_DIR"
+    QEMU="${PPCOSX_QEMU:-$QEMU_BUILD/qemu-system-ppc}"
     setup_build
 }
 
-setup_linux() {
-    local pm missing sudo=
-    say "Checking this Linux machine"
-    ok "Linux $(uname -r) ($(uname -m))"
-    pm=$(linux_pm)
-    [ -n "$pm" ] || die "no apt-get, dnf or pacman found. Install these (or your
-    distribution's names for them), then run $PROG setup again:
-    $(echo $APT_DEPS)"
+linux_install() {   # linux_install PM WHAT PACKAGES...: install what's missing
+    local pm="$1" what="$2" missing sudo=
+    shift 2
     [ "$(id -u)" = 0 ] || sudo=sudo
-    missing=$(linux_missing "$pm")
+    missing=$(linux_missing "$pm" "$*")
     if [ -n "$missing" ]; then
-        say "Installing build dependencies with $pm (asks for your password):"
+        say "Installing $what with $pm (asks for your password):"
         hint "$missing"
         case "$pm" in
             # shellcheck disable=SC2086
             apt) $sudo apt-get update && $sudo apt-get install -y $missing ;;
             dnf) $sudo dnf install -y $missing ;;
             pacman) $sudo pacman -S --needed --noconfirm $missing ;;
-        esac || die "installing packages failed; install them yourself and run $PROG setup again:
-    $missing"
+        esac || return 1
     fi
-    ok "build dependencies ($pm)"
+    ok "$what ($pm)"
+}
+
+# The pinned QEMU as a prebuilt download (no compiler needed).  Returns
+# nonzero, having changed nothing that matters, when there isn't one for
+# this machine: the caller then builds QEMU instead.
+setup_linux_prebuilt() {
+    local pm sha arch url tmp
+    say "Checking this Linux machine"
+    ok "Linux $(uname -r) ($(uname -m))"
+    pm=$(linux_pm)
+    case "$pm" in
+        apt) linux_install apt "run-time libraries" $APT_RUNTIME_DEPS || {
+                 warn "could not install the prebuilt QEMU's libraries; building QEMU instead"
+                 return 1; } ;;
+        dnf|pacman) linux_install "$pm" "dependencies" $(linux_deps "$pm") || return 1 ;;
+        *) return 1 ;;
+    esac
+    sha=$(git -C "$REPO" rev-parse HEAD:qemu 2>/dev/null) || return 1
+    if [ -f "$PREBUILT_DIR/VERSION" ] && [ "$(cat "$PREBUILT_DIR/VERSION")" = "$sha" ] &&
+       [ -x "$PREBUILT_DIR/bin/qemu-system-ppc" ]; then
+        ok "prebuilt QEMU (${sha:0:12}) already here"
+        setup_vulkan_check
+        return 0
+    fi
+    case "$(uname -m)" in x86_64|amd64) arch=x86_64 ;; aarch64|arm64) arch=aarch64 ;; *) return 1 ;; esac
+    url="https://github.com/$PREBUILT_REPO/releases/download/qemu-${sha:0:12}/ppcosx-qemu-linux-$arch.tar.xz"
+    tmp=$(mktemp -d)
+    say "Downloading a prebuilt QEMU (${sha:0:12}, $arch)"
+    if [ -n "${PPCOSX_QEMU_TARBALL:-}" ]; then
+        cp "$PPCOSX_QEMU_TARBALL" "$tmp/q.tar.xz" || { rm -rf "$tmp"; return 1; }
+    elif ! curl -fsSL -o "$tmp/q.tar.xz" "$url"; then
+        warn "no prebuilt QEMU for this version yet; building it instead"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! tar -C "$tmp" -xJf "$tmp/q.tar.xz" || [ ! -x "$tmp/ppcosx-qemu/bin/qemu-system-ppc" ]; then
+        warn "the prebuilt QEMU download is damaged; building QEMU instead"
+        rm -rf "$tmp"
+        return 1
+    fi
+    local libs
+    libs=$(ldd "$tmp/ppcosx-qemu/bin/qemu-system-ppc" 2>&1 | grep "not found" | awk '{print $1}' | tr '\n' ' ')
+    if [ -n "$libs" ] || ! "$tmp/ppcosx-qemu/bin/qemu-system-ppc" --version >/dev/null 2>&1; then
+        warn "the prebuilt QEMU does not run here${libs:+ (missing: $libs)}; building it instead"
+        rm -rf "$tmp"
+        return 1
+    fi
+    rm -rf "$PREBUILT_DIR"
+    mv "$tmp/ppcosx-qemu" "$PREBUILT_DIR"
+    rm -rf "$tmp"
+    QEMU="$PREBUILT_DIR/bin/qemu-system-ppc"
+    ok "installed $("$QEMU" --version | head -1) (prebuilt)"
+    setup_vulkan_check
+}
+
+setup_linux() {
+    local pm
+    pm=$(linux_pm)
+    [ -n "$pm" ] || die "no apt-get, dnf or pacman found. Install these (or your
+    distribution's names for them), then run $PROG setup again:
+    $(echo $APT_DEPS)"
+    linux_install "$pm" "build dependencies" $(linux_deps "$pm") \
+        || die "installing packages failed; install them yourself and run $PROG setup again"
+    setup_vulkan_check
+}
+
+setup_vulkan_check() {
     if command -v vulkaninfo >/dev/null 2>&1; then
         local gpu
         gpu=$(vulkaninfo --summary 2>/dev/null | sed -n 's/^[[:space:]]*deviceName[[:space:]]*=[[:space:]]*//p' | head -1)
@@ -323,6 +413,10 @@ setup_build() {
     fi
     ok "built $(basename "$QEMU")"
 
+    setup_done
+}
+
+setup_done() {
     mkdir -p "$VM_DIR/roms"
     [ -n "${PPCOSX_INSTALLER:-}" ] && return 0   # install.sh prints its own next steps
     echo
@@ -356,8 +450,12 @@ cmd_doctor() {
         ok "$HOST_OS $(uname -r) ($(uname -m))"
         pm=$(linux_pm)
         if [ -n "$pm" ]; then
-            missing=$(linux_missing "$pm")
-            [ -z "$missing" ] && ok "build dependencies ($pm)" \
+            if [ "$pm" = apt ] && [ -x "$PREBUILT_DIR/bin/qemu-system-ppc" ]; then
+                missing=$(linux_missing apt "$APT_RUNTIME_DEPS")
+            else
+                missing=$(linux_missing "$pm")
+            fi
+            [ -z "$missing" ] && ok "dependencies ($pm)" \
                 || { bad "packages missing:$missing"; hint "$PROG setup"; fail=1; }
         else
             warn "unknown package manager; cannot check dependencies"
@@ -663,7 +761,7 @@ cmd_run() {
 
     if [ "$MODE" = vga ]; then
         # UTM's "PowerPC G4" preset: QEMU VGA with the QEMU NDRV.  No 3D.
-        QARGS=(-L "$FW_VGA" -L "$QEMU_DIR/pc-bios" "${QARGS[@]}"
+        QARGS=(-L "$FW_VGA" -L "$QEMU_DATA" "${QARGS[@]}"
             -device loader,addr=0x4000000,file="$FW_VGA/ppc-ndrvloader"
             -prom-env "boot-command=$(model_forth)init-program go"
             -device VGA,edid=on -g "${RES}x32"
@@ -699,7 +797,7 @@ cmd_run() {
         else dev="$dev,romfile="; fi
 
         export QEMU_PPC_NDRV="$FW_RADEON/qemu_vga_hwc.ndrv"
-        QARGS=(-L "$FW_RADEON" -L "$QEMU_DIR/pc-bios" "${QARGS[@]}"
+        QARGS=(-L "$FW_RADEON" -L "$QEMU_DATA" "${QARGS[@]}"
             -device loader,addr=0x4000000,file="$FW_RADEON/ppc-ndrvloader"
             -prom-env "boot-command=$boot"
             -global uni-north-pci.agp-capable=on
@@ -754,7 +852,7 @@ cmd_install() {
     # Tiger installer is known to work with.  -no-reboot turns the
     # installer's final restart into a clean exit.
     build_common "$DISK" cd
-    QARGS=(-L "$FW_VGA" -L "$QEMU_DIR/pc-bios" "${QARGS[@]}"
+    QARGS=(-L "$FW_VGA" -L "$QEMU_DATA" "${QARGS[@]}"
         -device VGA,edid=on -g "${RES}x32"
         -drive "if=none,media=cdrom,id=cd,readonly=on,file=$iso"
         -device ide-cd,bus=ide.1,unit=0,drive=cd,bootindex=0
@@ -828,7 +926,7 @@ cmd_update() {
     [ -d "$REPO/.git" ] || die "$REPO is not a git checkout; reinstall with the one-line installer"
     say "Updating $REPO"
     git -C "$REPO" pull --ff-only || die "git pull failed (local changes in $REPO?)"
-    git -C "$REPO" submodule update --init --depth 1 qemu || die "could not update qemu/"
+    # setup fetches the new qemu/ source itself when it has to build it
     cmd_setup
 }
 
