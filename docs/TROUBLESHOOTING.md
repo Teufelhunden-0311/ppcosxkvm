@@ -10,6 +10,20 @@ Command Line Tools install in the dialog, then run `ppcosx setup` again.
 **`Homebrew is required`.** Install it from <https://brew.sh>, open a *new*
 terminal window (so `brew` is on your `PATH`), and re-run setup.
 
+**`MacPorts is required on an Intel Mac`.** Homebrew no longer supports
+Intel Macs. Install MacPorts from <https://www.macports.org/install.php>
+(pick the package for your macOS version), open a new terminal window, and
+re-run setup.
+
+**`port install failed`.** Update MacPorts' package list with
+`sudo port selfupdate`, then re-run setup. If one port fails to build,
+`sudo port clean <name>` and try again. `ppcosx doctor` lists what's
+still missing.
+
+**`the Metal renderer needs an Apple Silicon GPU`.** You're on an Intel
+Mac and asked for `--gpu metal` (or set `PPCOSX_GPU=metal`). Use the
+default, Vulkan.
+
 **`qemu/ is empty` / `could not fetch the qemu submodule`.** Fetching the
 QEMU fork failed. Check your network, then run
 `git submodule update --init --depth 1 qemu` and `ppcosx setup`.

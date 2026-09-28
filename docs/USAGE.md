@@ -34,10 +34,11 @@ without the word `run`: `ppcosx --vga` is `ppcosx run --vga`.
 | `--vram MB` | 128 | Radeon video memory: 64, 128 or 256. The real 9700 PRO has 128. |
 | `--res WxH` | 1024x768 | Initial screen size. The Radeon mode is tested at 1024×768; other sizes are experimental. |
 | `--rom PATH` / `--no-rom` | `vm/roms/radeon9700.rom` if present | Radeon option ROM. |
-| `--gpu metal\|vulkan` (or `--gpumetal`, `--gpuvulkan`) | Metal on macOS, Vulkan on Linux | Host 3D API for the Radeon. On a Mac, Vulkan runs through MoltenVK. Asking for one the host can't provide stops with the reason. |
+| `--gpu metal\|vulkan` (or `--gpumetal`, `--gpuvulkan`) | Metal on Apple Silicon, Vulkan on Intel Macs and Linux | Host 3D API for the Radeon. On a Mac, Vulkan runs through MoltenVK. Metal needs an Apple GPU. Asking for one the host can't provide stops with the reason. |
 | `--attach-dvd IMG` (or `--dvd`, `--cd`) | | Insert a DVD/CD image (`.iso` `.cdr` `.dmg` `.toast`), e.g. to install software from a disc. A `.dmg` is converted once to a raw `.cdr` in the VM folder (QEMU can't read compressed `.dmg`s). |
 | `--verbose` (or `-v`) | off | Text-mode ("verbose") boot instead of the grey Apple. Good for diagnosing hangs. |
 | `--snapshot` | off | Throwaway session: all disk writes are discarded when QEMU exits. The disk must not be in use by another VM. |
+| `--no-audio` | off | No sound: the guest keeps its sound hardware, but QEMU uses no host audio backend (`-audio none`). For hosts where CoreAudio or PulseAudio misbehaves. `PPCOSX_NO_AUDIO=1` sets it by default. |
 | `--ssh-port N` | | Forward `127.0.0.1:N` on the host to the guest's SSH (turn on *Remote Login* in the guest's Sharing preferences). |
 | `--monitor` | off | QEMU's monitor on `127.0.0.1:4444` (HMP) and `:4445` (QMP), for `tools/vmctl.py` and scripting. |
 | `--trace-gpu` | off | Log every GPU register access to `vm/gpu-trace.log`. Very slow; for debugging only. |
@@ -89,6 +90,7 @@ Defaults you can set once in your shell profile instead of on every run:
 | `PPCOSX_CPU_MHZ` | Like `--cpu-mhz`. |
 | `PPCOSX_MODEL` | Like `--model`. |
 | `PPCOSX_QEMU` | A different `qemu-system-ppc` to run (e.g. your own build). |
+| `PPCOSX_PKG` | macOS: `brew` or `macports`, the package manager `setup` uses (default: Homebrew on Apple Silicon, MacPorts on Intel, whichever is installed). |
 
 For the installer (`install.sh`): `PPCOSX_HOME` (where to install,
 default `~/.ppcosx`), `PPCOSX_BRANCH` (default `main`) and `PPCOSX_REPO`

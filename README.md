@@ -31,6 +31,8 @@ Mac with `--gpuvulkan`).
 
 * 💻 A Mac with **Apple Silicon** (M1 or newer) and
   **[Homebrew](https://brew.sh)** (the installer tells you if it's missing),
+  **or** an **Intel Mac** with **[MacPorts](https://www.macports.org/install.php)**
+  (Homebrew no longer supports Intel; see below),
   **or** a Linux PC with a Vulkan GPU driver and `git` (Debian/Ubuntu,
   Fedora or Arch: the installer gets the rest with `sudo`)
 * 💿 **Mac OS X Tiger (or Leopard) for PowerPC**, which you provide yourself. Either:
@@ -93,6 +95,7 @@ Other handy ways to start it:
 | `ppcosx --cpu-mhz 2500` | Change the CPU speed Mac OS X sees (default 2 GHz); it doesn't make it faster |
 | `ppcosx --model PowerBook6,8` | Change the Mac model Mac OS X sees (default: a PowerBook G4, so Aperture runs) |
 | `ppcosx --snapshot` | Try something risky: nothing you do is saved |
+| `ppcosx --no-audio` | Start without sound, if audio crashes or misbehaves on your Mac |
 | `ppcosx doctor` | Check that everything is set up correctly |
 | `ppcosx update` | Get the latest version |
 | `ppcosx help` | See every command and option |
@@ -101,9 +104,11 @@ Other handy ways to start it:
 
 * 🖱️ **Mouse stuck in the window?** Press **Ctrl + Option + G** (Linux:
   **Ctrl + Alt + G**) to get it back.
-* 🎮 **Metal or Vulkan:** on a Mac the Radeon renders with Metal; add
-  `--gpuvulkan` to use Vulkan (through MoltenVK) instead. Linux always uses
-  Vulkan.
+* 🎮 **Metal or Vulkan:** on an Apple Silicon Mac the Radeon renders with
+  Metal; add `--gpuvulkan` to use Vulkan (through MoltenVK) instead. Intel
+  Macs and Linux always use Vulkan: the Metal renderer needs an Apple GPU.
+* 🖥️ **Intel Macs** work, but more slowly: the AltiVec speed-ups are for
+  ARM processors, and the Radeon goes through Vulkan and MoltenVK.
 * ⏻ **Turning it off:** use **Apple menu → Shut Down** inside Mac OS X, like a real
   Mac. Closing the window is like pulling the power plug.
 * 💾 **Save a restore point:** with the VM off, run
@@ -138,7 +143,7 @@ Leopard to 10.5.8 with the *10.5.8 Combo Update*.
 | | |
 |---|---|
 | ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess, Quake III Arena), QuickTime video, Aperture 1.5, hardware cursor, keyboard and mouse |
-| 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (built and set up on Ubuntu 24.04; not yet run on a Linux GPU) |
+| 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (built and set up on Ubuntu 24.04; not yet run on a Linux GPU), Intel Macs with MacPorts (not yet run on one) |
 | ✅ Leopard | 10.5 to 10.5.8 with Quartz Extreme, Core Image and OpenGL (Chess); installs from the retail DVD image, or upgrades a Tiger disk |
 | ❌ Not yet | Multiple CPUs, video decode acceleration |
 

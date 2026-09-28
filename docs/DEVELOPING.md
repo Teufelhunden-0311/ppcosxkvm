@@ -45,6 +45,12 @@ ppcosx run
 `ppcosx setup` does the same, and also re-runs configure on a fresh
 build directory.
 
+On macOS, `setup` gets the libraries from Homebrew on Apple Silicon and
+from MacPorts on Intel Macs (`PPCOSX_PKG=brew|macports` overrides it). The
+lists are `BREW_DEPS` and `PORT_DEPS` at the top of `ppcosx`. QEMU finds
+them all through `pkg-config`, so nothing else in the build knows which
+one it was.
+
 ## Updating the QEMU fork
 
 `qemu/` is a submodule tracking the `r300` branch of the fork:
