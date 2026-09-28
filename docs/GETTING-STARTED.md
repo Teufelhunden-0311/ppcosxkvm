@@ -39,7 +39,9 @@ The installer:
    tells you how to get whichever is missing, then you re-run it),
 2. downloads the project into `~/.ppcosx` (set `PPCOSX_HOME` to choose
    another folder),
-3. `brew install`s `ninja pkgconf glib pixman libslirp` (only the missing ones),
+3. `brew install`s the build tools and libraries QEMU and the GPU backends
+   need (ninja, pkgconf, glib, pixman, libslirp, shaderc, SPIRV-Cross,
+   glslang, the Vulkan headers and loader, MoltenVK; only the missing ones),
 4. fetches the QEMU fork (a shallow git submodule, several hundred MB) and
    builds `qemu-system-ppc` and `qemu-img`: a few minutes the first time,
 5. adds the `ppcosx` command: a link in Homebrew's `bin` folder, which is
@@ -112,6 +114,17 @@ The disk has to contain **PowerPC** Mac OS X. An Intel ("x86") OS X disk
 won't boot on this emulated G4.
 
 ## 4. Boot
+
+If you installed from an original 10.4 DVD, update to 10.4.11 first. The
+Radeon driver in 10.4.0 (build 8A428) panics on the emulated card. Boot
+with the plain framebuffer and the Combo Update inserted, run the Setup
+Assistant, install the update, then shut down:
+
+```bash
+ppcosx run --vga --attach-dvd ~/Downloads/MacOSXUpdCombo10.4.11PPC.dmg
+```
+
+Then boot with the Radeon:
 
 ```bash
 ppcosx run

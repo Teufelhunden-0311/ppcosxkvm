@@ -93,8 +93,8 @@ R300_DRAWLOG=/tmp/draws.log ppcosx run --snapshot --verbose
 
 ## Driving the guest from scripts
 
-`ppcosx run --monitor` opens the QEMU monitor on 127.0.0.1:4444 (HMP) and
-4445 (QMP). `tools/vmctl.py` wraps it:
+`ppcosx run --monitor` (or `ppcosx install --monitor`) opens the QEMU
+monitor on 127.0.0.1:4444 (HMP) and 4445 (QMP). `tools/vmctl.py` wraps it:
 
 ```bash
 tools/vmctl.py shot /tmp/screen.png
@@ -105,8 +105,13 @@ tools/vmctl.py click 512 384
 tools/vmctl.py cmd 'info pci'
 ```
 
+Clicks go through a USB tablet, in guest pixels at the current resolution.
+An installed Tiger scales tablet input by 1.1775 about the centre, which
+`vmctl` undoes; the installer DVD doesn't, so use `VMCTL_SCALE=1` there.
+
 Useful HMP commands: `xp /2wx 0xa000ff0c` reads the hardware cursor
-position (the MMIO BAR is at 0xA0000000), and `info registers` samples the
+position (the MMIO BAR is at 0xA0000000 with the default `--vram 128`;
+`info pci` shows where it is), and `info registers` samples the
 guest CPU (useful for finding where the ATI kext is spinning).
 
 ## Reading the ATI kext
