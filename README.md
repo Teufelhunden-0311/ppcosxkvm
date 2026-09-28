@@ -1,7 +1,7 @@
 # ppcosxkvm
 
-**Run Mac OS X Tiger (the PowerPC version) on your Apple Silicon Mac, with
-working 3D graphics.**
+**Run Mac OS X Tiger (the PowerPC version) on your Apple Silicon Mac or
+Linux PC, with working 3D graphics.**
 
 Old PowerPC Macs and their software, back on a modern Mac: the Aqua desktop
 with Quartz Extreme, Core Image and OpenGL apps, accelerated by your Mac's
@@ -18,7 +18,8 @@ Image are switched off.
 ppcosxkvm emulates a real graphics card that Tiger already knows: the
 **ATI Radeon 9700 PRO**. Tiger uses Apple's own driver for it, exactly as
 on a real Power Mac G4. Everything that driver asks the card to draw is
-handed to your Mac's GPU through Metal.
+handed to your GPU through Metal (on a Mac) or Vulkan (on Linux, and on a
+Mac with `--gpuvulkan`).
 
 * ✅ **Quartz Extreme**: windows and the Dock composited by the GPU
 * ✅ **Core Image**: reported as supported, with the programmable
@@ -28,8 +29,10 @@ handed to your Mac's GPU through Metal.
 
 ## What you need
 
-* 💻 A Mac with **Apple Silicon** (M1 or newer)
-* 🍺 **[Homebrew](https://brew.sh)** (the installer tells you if it's missing)
+* 💻 A Mac with **Apple Silicon** (M1 or newer) and
+  **[Homebrew](https://brew.sh)** (the installer tells you if it's missing),
+  **or** a Linux PC with a Vulkan GPU driver and `git` (Debian/Ubuntu,
+  Fedora or Arch: the installer gets the rest with `sudo`)
 * 💿 **Mac OS X Tiger for PowerPC**, which you provide yourself. Either:
   * a Tiger **install DVD image** (`.iso`, `.dmg`, `.cdr` or `.toast`), or
   * a Tiger **disk you already have** from another emulator, such as UTM,
@@ -96,8 +99,11 @@ Other handy ways to start it:
 
 ## Good to know
 
-* 🖱️ **Mouse stuck in the window?** Press **Ctrl + Option + G** to get it
-  back.
+* 🖱️ **Mouse stuck in the window?** Press **Ctrl + Option + G** (Linux:
+  **Ctrl + Alt + G**) to get it back.
+* 🎮 **Metal or Vulkan:** on a Mac the Radeon renders with Metal; add
+  `--gpuvulkan` to use Vulkan (through MoltenVK) instead. Linux always uses
+  Vulkan.
 * ⏻ **Turning it off:** use **Apple menu → Shut Down** inside Mac OS X, like a real
   Mac. Closing the window is like pulling the power plug.
 * 💾 **Save a restore point:** with the VM off, run
@@ -127,7 +133,7 @@ Tested on **Mac OS X 10.4.11**. For the best results, update Tiger to
 | | |
 |---|---|
 | ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess), hardware cursor, keyboard and mouse |
-| 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768 |
+| 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (built and set up on Ubuntu 24.04; not yet run on a Linux GPU) |
 | ❌ Not yet | Leopard (10.5), multiple CPUs, video decode acceleration |
 
 ## More documentation
@@ -136,7 +142,7 @@ Tested on **Mac OS X 10.4.11**. For the best results, update Tiger to
 * 🧰 [Using ppcosx](docs/USAGE.md): every command and option, moving files in and out
 * 🩺 [Troubleshooting](docs/TROUBLESHOOTING.md)
 * 🔌 [The ATI ROM](docs/ROM.md): optional, and why
-* 🔬 [How it works](docs/HOW-IT-WORKS.md): the emulated Radeon and the Metal translation
+* 🔬 [How it works](docs/HOW-IT-WORKS.md): the emulated Radeon and the Metal/Vulkan translation
 * 🛠️ [Developing](docs/DEVELOPING.md): building from source, debug switches, tests
 
 ## Legal

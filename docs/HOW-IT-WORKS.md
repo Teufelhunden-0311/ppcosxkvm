@@ -28,8 +28,11 @@ QEMU   │   ati-radeon-9700 device (hw/display/ppc_mac_gpu.c)
        │     └─ draw assembly: primitives, index buffers, point sprites (r300_draw.c)
        │   Metal backend (hw/display/ppc_mac_gpu_metal.m)
        │     └─ render targets and textures in VRAM ⇄ Metal textures
+       │   or Vulkan backend (hw/display/ppc_mac_gpu_vulkan.c)
+       │     └─ images on the GPU, copied to/from VRAM on demand
 ───────┼──────────────────────────────────────────────────────────
-host   │ Apple Silicon GPU
+host   │ Apple Silicon GPU (Metal, or Vulkan via MoltenVK), or a
+       │ Linux GPU (Vulkan)
 ```
 
 ### Boot chain
@@ -94,6 +97,35 @@ For each draw, the device snapshots the R300 state and:
 * **MSAA:** a multisampled buffer stores sample *k* of row *y* at row
   *y·n+k*, the same footprint the driver allocates. Each sample is drawn
   with shifted geometry, and `RB3D_AARESOLVE` averages them.
+
+### Metal and Vulkan
+
+The device picks its backend with the `renderer` property (`ppcosx
+--gpu metal|vulkan`, `--gpumetal`, `--gpuvulkan`). Metal is the default on
+macOS, Vulkan elsewhere; asking for one the host can't provide fails
+at startup with the reason.
+
+Both backends run the same GLSL. Metal compiles it on to MSL; Vulkan
+uses the SPIR-V directly, in a variant that reads shader-decoded texture
+formats from a storage buffer of VRAM.
+
+They differ in where the pixels live. Metal renders straight into VRAM:
+render targets and most textures are linear texture views of the one
+shared buffer that is also the guest's VRAM. Vulkan can't do that (an
+image can't alias a buffer at the guest's pitch, and a discrete GPU's
+memory isn't the CPU's), so:
+
+* VRAM is host-visible Vulkan memory, the CPU's copy. The GPU only
+  copies from and to it, and reads odd texture formats from it.
+* Colour and depth buffers and textures are images on the GPU, cached
+  by their VRAM range and layout.
+* Every VRAM page has a write generation. CPU writes (the device's
+  dirty log) and GPU writes (a draw into an image) stamp the pages they
+  touch. An image with an older stamp than its range is copied from VRAM
+  before use, after any newer rendering over that range is written back.
+* What a batch renders is written back to VRAM when the batch is
+  submitted, so fences, scanout and CPU reads see finished drawing
+  exactly as with Metal.
 
 ### Presenting
 

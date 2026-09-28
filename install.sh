@@ -26,30 +26,45 @@ main() {
     say()  { printf '%s==>%s %s\n' "$B" "$N" "$*" >&2; }
     fail() { printf '%serror:%s %s\n' "$R" "$N" "$*" >&2; exit 1; }
 
-    printf '%sppcosxkvm installer%s - PowerPC Mac OS X on Apple Silicon\n\n' "$B" "$N" >&2
+    printf '%sppcosxkvm installer%s - PowerPC Mac OS X on Apple Silicon and Linux\n\n' "$B" "$N" >&2
 
-    [ "$(uname -s)" = Darwin ] || fail "ppcosxkvm runs on macOS only."
-    if [ "$(uname -m)" != arm64 ]; then
-        printf '%s!%s This is not an Apple Silicon Mac; continuing, but it is untested.\n' "$Y" "$N" >&2
-    fi
+    case "$(uname -s)" in
+    Darwin)
+        if [ "$(uname -m)" != arm64 ]; then
+            printf '%s!%s This is not an Apple Silicon Mac; continuing, but it is untested.\n' "$Y" "$N" >&2
+        fi
 
-    if ! xcode-select -p >/dev/null 2>&1; then
-        xcode-select --install >/dev/null 2>&1 || true
-        fail "The Xcode Command Line Tools are needed. An installer window should
+        if ! xcode-select -p >/dev/null 2>&1; then
+            xcode-select --install >/dev/null 2>&1 || true
+            fail "The Xcode Command Line Tools are needed. An installer window should
 have opened: finish it, then run this one-liner again."
-    fi
+        fi
 
-    if ! command -v brew >/dev/null 2>&1; then
-        local b
-        for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-            [ -x "$b" ] && eval "$("$b" shellenv)" && break
-        done
-    fi
-    command -v brew >/dev/null 2>&1 || fail "Homebrew is needed. Install it with:
+        if ! command -v brew >/dev/null 2>&1; then
+            local b
+            for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+                [ -x "$b" ] && eval "$("$b" shellenv)" && break
+            done
+        fi
+        command -v brew >/dev/null 2>&1 || fail "Homebrew is needed. Install it with:
 
   /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"
 
 then open a new terminal window and run this one-liner again."
+        ;;
+    Linux)
+        # ppcosx setup installs the build tools with apt, dnf or pacman
+        # (through sudo); it only needs git to get that far.
+        command -v git >/dev/null 2>&1 || fail "git is needed first, e.g.:
+
+  sudo apt install git      (Debian, Ubuntu)
+  sudo dnf install git      (Fedora)
+  sudo pacman -S git        (Arch)"
+        ;;
+    *)
+        fail "ppcosxkvm runs on macOS and Linux only."
+        ;;
+    esac
 
     if [ -d "$dir/.git" ]; then
         say "Updating the existing install in $dir"

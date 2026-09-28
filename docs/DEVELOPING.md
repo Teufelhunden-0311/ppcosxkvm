@@ -12,6 +12,7 @@ firmware/               OpenBIOS, ndrvloader, NDRV (+ sources/patchers in src/)
 qemu/                   git submodule: the QEMU fork (branch r300)
   hw/display/ppc_mac_gpu.c        the device: PCI, MMIO, CP/PM4, GART, 2D, scanout
   hw/display/ppc_mac_gpu_metal.m  Metal backend
+  hw/display/ppc_mac_gpu_vulkan.c Vulkan backend (MoltenVK on macOS)
   hw/display/r300/                R300 3D: state, PVS, US→GLSL, SPIR-V/MSL, draw assembly
   tests/r300/                     offline tests (run.sh)
 tools/vmctl.py          drive a running VM: keys, clicks, screenshots, HMP
@@ -73,6 +74,8 @@ Environment variables read by the device. Set them in front of `ppcosx run`:
 | `R300_DUMP=path` | Full per-draw state plus register trace, and dumps of textures and render targets (`path.NN.*.bin`). |
 | `R300_RINGDUMP=path` | Raw command-ring contents. |
 | `R300_SURFWATCH=1` | Log CPU accesses to the VRAM range the driver maps through a `SURFACE` register (e.g. depth readback for picking). |
+| `PPCGPU_VK_CHECK=1` | Vulkan backend: log textures that changed in VRAM without the backend being told, and CPU writes over rendering not yet written back. |
+| `PPCGPU_VK_DEVICE=n` | Vulkan backend: use Vulkan device number *n* instead of the first discrete (else integrated) GPU. |
 | `R300_SYNC=1` | Flush to Metal after every draw instead of batching (isolates ordering bugs). |
 | `PPCGPU_SEQ_LOG=1` | Packet sequence log (`/tmp/gpu_seq.log`), including 2D blits (`BBMRAW`) and 3D (`R3D`) lines. |
 | `PPCGPU_DEBUG_LOG=1` | General device debug log. |
