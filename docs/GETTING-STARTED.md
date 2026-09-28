@@ -6,9 +6,11 @@ acceleration. If something goes wrong, see
 
 ## 1. What you need
 
-* **An Apple Silicon Mac** (M1 or later) on a recent macOS. Intel Macs
-  aren't tested.
-* **Homebrew**: <https://brew.sh>.
+* **A Mac on a recent macOS.** Apple Silicon (M1 or later) is the main
+  target. Intel Macs work too (see [On an Intel Mac](#on-an-intel-mac)).
+* **Homebrew** (<https://brew.sh>) on Apple Silicon, or **MacPorts**
+  (<https://www.macports.org/install.php>) on an Intel Mac, where Homebrew
+  is no longer supported.
 * **Xcode Command Line Tools.** `setup` starts the installer if they're
   missing. The full Xcode app isn't needed.
 * **About 25 GB free**: roughly 1.5 GB for the QEMU build, plus the guest
@@ -35,13 +37,15 @@ curl -fsSL https://raw.githubusercontent.com/linuxkid473/ppcosxkvm/main/install.
 
 The installer:
 
-1. checks that this is a Mac with the Command Line Tools and Homebrew (it
-   tells you how to get whichever is missing, then you re-run it),
+1. checks that this is a Mac with the Command Line Tools and Homebrew
+   (MacPorts on an Intel Mac); it tells you how to get whichever is
+   missing, then you re-run it,
 2. downloads the project into `~/.ppcosx` (set `PPCOSX_HOME` to choose
    another folder),
-3. `brew install`s the build tools and libraries QEMU and the GPU backends
-   need (ninja, pkgconf, glib, pixman, libslirp, shaderc, SPIRV-Cross,
-   glslang, the Vulkan headers and loader, MoltenVK; only the missing ones),
+3. installs the build tools and libraries QEMU and the GPU backends need
+   with `brew install` (or `sudo port install`): ninja, pkgconf, glib,
+   pixman, libslirp, shaderc, SPIRV-Cross, glslang, the Vulkan headers and
+   loader, MoltenVK; only the missing ones,
 4. fetches the QEMU fork (a shallow git submodule, several hundred MB) and
    builds `qemu-system-ppc` and `qemu-img`: a few minutes the first time,
 5. adds the `ppcosx` command: a link in Homebrew's `bin` folder, which is
@@ -52,6 +56,29 @@ Running the one-liner again, or `ppcosx update`, updates to the latest
 version and rebuilds what changed. `ppcosx unlink` removes the command, and
 deleting `~/.ppcosx` removes everything, **including your VMs in
 `~/.ppcosx/vm`**, so copy those out first.
+
+### On an Intel Mac
+
+Homebrew no longer supports Intel Macs, so on one the installer uses
+**MacPorts** instead. Install MacPorts first: download the installer for
+your macOS version from <https://www.macports.org/install.php>, run it,
+and open a new terminal window. Then paste the same one-liner. `setup`
+installs the same libraries with `sudo port install` (it asks for your
+password), plus Python 3.13 for the build, and compiles QEMU for Intel.
+
+What's different on Intel:
+
+* **The Radeon renders with Vulkan, through MoltenVK**, not Metal. The
+  Metal renderer relies on framebuffer fetch and on textures that share
+  memory with the CPU, which only Apple GPUs have. `ppcosx` picks Vulkan
+  automatically, and says so if you ask for `--gpu metal`.
+* **It's slower.** The emulated CPU runs on an x86 host, where the
+  AltiVec-to-NEON translation doesn't apply (AltiVec falls back to QEMU's
+  portable code), and older Intel Macs are slower in general.
+
+If you already have Homebrew on an Intel Mac and no MacPorts, `setup`
+still uses Homebrew. `PPCOSX_PKG=macports` or `PPCOSX_PKG=brew` picks one
+explicitly on any Mac.
 
 ### On Linux
 

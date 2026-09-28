@@ -31,6 +31,8 @@ Mac with `--gpuvulkan`).
 
 * 💻 A Mac with **Apple Silicon** (M1 or newer) and
   **[Homebrew](https://brew.sh)** (the installer tells you if it's missing),
+  **or** an **Intel Mac** with **[MacPorts](https://www.macports.org/install.php)**
+  (Homebrew no longer supports Intel; see below),
   **or** a Linux PC with a Vulkan GPU driver and `git` (Debian/Ubuntu,
   Fedora or Arch: the installer gets the rest with `sudo`)
 * 💿 **Mac OS X Tiger for PowerPC**, which you provide yourself. Either:
@@ -101,9 +103,11 @@ Other handy ways to start it:
 
 * 🖱️ **Mouse stuck in the window?** Press **Ctrl + Option + G** (Linux:
   **Ctrl + Alt + G**) to get it back.
-* 🎮 **Metal or Vulkan:** on a Mac the Radeon renders with Metal; add
-  `--gpuvulkan` to use Vulkan (through MoltenVK) instead. Linux always uses
-  Vulkan.
+* 🎮 **Metal or Vulkan:** on an Apple Silicon Mac the Radeon renders with
+  Metal; add `--gpuvulkan` to use Vulkan (through MoltenVK) instead. Intel
+  Macs and Linux always use Vulkan: the Metal renderer needs an Apple GPU.
+* 🖥️ **Intel Macs** work, but more slowly: the AltiVec speed-ups are for
+  ARM processors, and the Radeon goes through Vulkan and MoltenVK.
 * ⏻ **Turning it off:** use **Apple menu → Shut Down** inside Mac OS X, like a real
   Mac. Closing the window is like pulling the power plug.
 * 💾 **Save a restore point:** with the VM off, run
@@ -137,7 +141,7 @@ Tested on **Mac OS X 10.4.11**. For the best results, update Tiger to
 | | |
 |---|---|
 | ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess, Quake III Arena), QuickTime video, Aperture 1.5, hardware cursor, keyboard and mouse |
-| 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (built and set up on Ubuntu 24.04; not yet run on a Linux GPU) |
+| 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (built and set up on Ubuntu 24.04; not yet run on a Linux GPU), Intel Macs with MacPorts (not yet run on one) |
 | ❌ Not yet | Leopard (10.5), multiple CPUs, video decode acceleration |
 
 ## More documentation

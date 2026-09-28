@@ -151,8 +151,12 @@ For each draw, the device snapshots the R300 state and:
 
 The device picks its backend with the `renderer` property (`ppcosx
 --gpu metal|vulkan`, `--gpumetal`, `--gpuvulkan`). Metal is the default on
-macOS, Vulkan elsewhere; asking for one the host can't provide fails
-at startup with the reason.
+Apple Silicon, Vulkan elsewhere; asking for one the host can't provide
+fails at startup with the reason. The Metal backend needs an Apple GPU:
+its shaders read the pixels they blend into with framebuffer fetch, and
+it renders into linear textures that share memory with the CPU, neither
+of which the Intel and AMD GPUs in Intel Macs support. Intel Macs use
+Vulkan through MoltenVK, which needs neither.
 
 Both backends run the same GLSL. Metal compiles it on to MSL; Vulkan
 uses the SPIR-V directly, in a variant that reads shader-decoded texture

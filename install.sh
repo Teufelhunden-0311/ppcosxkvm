@@ -26,12 +26,14 @@ main() {
     say()  { printf '%s==>%s %s\n' "$B" "$N" "$*" >&2; }
     fail() { printf '%serror:%s %s\n' "$R" "$N" "$*" >&2; exit 1; }
 
-    printf '%sppcosxkvm installer%s - PowerPC Mac OS X on Apple Silicon and Linux\n\n' "$B" "$N" >&2
+    printf '%sppcosxkvm installer%s - PowerPC Mac OS X on macOS and Linux\n\n' "$B" "$N" >&2
 
     case "$(uname -s)" in
     Darwin)
-        if [ "$(uname -m)" != arm64 ]; then
-            printf '%s!%s This is not an Apple Silicon Mac; continuing, but it is untested.\n' "$Y" "$N" >&2
+        local arm=0
+        [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = 1 ] && arm=1
+        if [ "$arm" = 0 ]; then
+            printf '%s!%s This is an Intel Mac: it works, but the Radeon renders with Vulkan\n  (MoltenVK) instead of Metal, and it is slower than on Apple Silicon.\n' "$Y" "$N" >&2
         fi
 
         if ! xcode-select -p >/dev/null 2>&1; then
@@ -40,17 +42,35 @@ main() {
 have opened: finish it, then run this one-liner again."
         fi
 
+        # A package manager: Homebrew on Apple Silicon, MacPorts on Intel
+        # (Homebrew no longer supports Intel Macs); either will do if it's
+        # the one already installed.
         if ! command -v brew >/dev/null 2>&1; then
             local b
             for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
                 [ -x "$b" ] && eval "$("$b" shellenv)" && break
             done
         fi
-        command -v brew >/dev/null 2>&1 || fail "Homebrew is needed. Install it with:
+        if ! command -v port >/dev/null 2>&1 && [ -x /opt/local/bin/port ]; then
+            PATH="/opt/local/bin:/opt/local/sbin:$PATH"
+        fi
+        if ! command -v brew >/dev/null 2>&1 && ! command -v port >/dev/null 2>&1; then
+            if [ "$arm" = 1 ]; then
+                fail "Homebrew is needed. Install it with:
 
   /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"
 
+then open a new terminal window and run this one-liner again.
+(MacPorts works too: https://www.macports.org/install.php)"
+            else
+                fail "MacPorts is needed on an Intel Mac (Homebrew no longer supports Intel).
+Download and run the installer for your macOS version from:
+
+  https://www.macports.org/install.php
+
 then open a new terminal window and run this one-liner again."
+            fi
+        fi
         ;;
     Linux)
         # ppcosx setup installs the build tools with apt, dnf or pacman

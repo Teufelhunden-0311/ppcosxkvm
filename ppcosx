@@ -1,5 +1,5 @@
 #!/bin/bash
-# ppcosx - run PowerPC Mac OS X (Tiger) on Apple Silicon or Linux with an
+# ppcosx - run PowerPC Mac OS X (Tiger) on a Mac or Linux with an
 # emulated ATI Radeon 9700 PRO whose 3D engine is translated to Metal
 # (macOS) or Vulkan (macOS through MoltenVK, and Linux).
 #
@@ -52,6 +52,9 @@ CPU_MHZ_DEFAULT=2000  # CPU speed Mac OS X is told (reporting only; QEMU says 90
 MODEL_DEFAULT=PowerBook5,8
 RADEON_SLOT=e         # PCI slot of the Radeon; names its device-tree node
 BREW_DEPS="ninja pkgconf glib pixman libslirp shaderc spirv-cross glslang vulkan-headers vulkan-loader molten-vk"
+# The same from MacPorts, for Intel Macs (which Homebrew no longer supports),
+# plus a Python for the build: the Command Line Tools' one may be too old.
+PORT_DEPS="ninja pkgconfig glib2 libpixman libslirp shaderc spirv-cross glslang vulkan-headers vulkan-loader MoltenVK python313"
 # Linux build and run dependencies, per package manager: QEMU's (glib,
 # pixman, slirp, GTK display, PulseAudio/PipeWire sound), the Vulkan
 # loader and a driver, and the shader toolchain (shaderc, SPIRV-Cross).
@@ -72,6 +75,51 @@ PACMAN_DEPS="base-devel git ninja pkgconf python flex bison glib2 pixman libslir
     spirv-tools"
 HOST_OS=$(uname -s)
 [ "$HOST_OS" = Darwin ] && IS_MAC=1 || IS_MAC=0
+
+# Apple Silicon hardware, even from a shell running under Rosetta.
+apple_silicon() {
+    [ "$IS_MAC" = 1 ] && [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = 1 ]
+}
+
+# MacPorts lives in /opt/local; a shell opened before it was installed
+# doesn't have it on the PATH yet.
+[ "$IS_MAC" = 1 ] && ! command -v port >/dev/null 2>&1 && [ -x /opt/local/bin/port ] \
+    && PATH="/opt/local/bin:/opt/local/sbin:$PATH"
+# Likewise Homebrew.
+if [ "$IS_MAC" = 1 ] && ! command -v brew >/dev/null 2>&1; then
+    for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        [ -x "$b" ] && eval "$("$b" shellenv)" && break
+    done
+fi
+
+# The Mac package manager to use: PPCOSX_PKG=brew|macports, else Homebrew
+# on Apple Silicon and MacPorts on Intel, whichever is installed first.
+mac_pm() {
+    case "${PPCOSX_PKG:-}" in brew|macports) echo "$PPCOSX_PKG"; return ;; esac
+    local order="brew macports" pm
+    apple_silicon || order="macports brew"
+    for pm in $order; do
+        case "$pm" in
+            brew) command -v brew >/dev/null 2>&1 && { echo brew; return; } ;;
+            macports) command -v port >/dev/null 2>&1 && { echo macports; return; } ;;
+        esac
+    done
+    echo "${order%% *}"          # none installed: the one to ask for
+}
+
+mac_missing() {   # packages of $1's list that aren't installed
+    local pm="$1" p missing=
+    if [ "$pm" = brew ]; then
+        for p in $BREW_DEPS; do
+            brew list --formula "$p" >/dev/null 2>&1 || missing="$missing $p"
+        done
+    else
+        for p in $PORT_DEPS; do
+            port -q installed "$p" 2>/dev/null | grep -q "(active)" || missing="$missing $p"
+        done
+    fi
+    echo "$missing"
+}
 
 # ---------------------------------------------------------------- output ---
 if [ -t 1 ]; then
@@ -155,7 +203,7 @@ linux_missing() {   # packages of $1's list (or of list $2) that aren't installe
 # ------------------------------------------------------------------ help ---
 usage() {
     cat <<EOF
-${B}ppcosx${N} - PowerPC Mac OS X (Tiger) on Apple Silicon or Linux, with an emulated
+${B}ppcosx${N} - PowerPC Mac OS X (Tiger) on a Mac or Linux, with an emulated
 ATI Radeon 9700 PRO (Quartz Extreme, Core Image and OpenGL via Metal or Vulkan).
 
 ${B}First time${N}
@@ -329,11 +377,15 @@ setup_vulkan_check() {
 }
 
 setup_mac() {
+    local pm missing
     say "Checking this Mac"
-    if [ "$(uname -m)" != arm64 ]; then
-        warn "this is not an Apple Silicon Mac ($(uname -m)); it may work but is untested"
-    else
+    if apple_silicon; then
         ok "Apple Silicon ($(sysctl -n machdep.cpu.brand_string 2>/dev/null))"
+        [ "$(uname -m)" = arm64 ] || warn "this shell runs under Rosetta ($(uname -m)); QEMU would be built for Intel. Open a native terminal."
+    else
+        ok "Intel Mac ($(sysctl -n machdep.cpu.brand_string 2>/dev/null))"
+        warn "on an Intel Mac the Radeon renders with Vulkan (MoltenVK), not Metal, and the"
+        warn "AltiVec speed-ups (ARM only) don't apply, so expect it to be slower"
     fi
     ok "macOS $(sw_vers -productVersion)"
 
@@ -344,25 +396,35 @@ setup_mac() {
     fi
     ok "Command Line Tools ($(xcode-select -p))"
 
-    if ! command -v brew >/dev/null 2>&1; then
-        for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-            [ -x "$b" ] && eval "$("$b" shellenv)" && break
-        done
+    pm=$(mac_pm)
+    if [ "$pm" = brew ]; then
+        command -v brew >/dev/null 2>&1 || die "Homebrew is required: https://brew.sh
+    Install it, open a new terminal, and run $PROG setup again.
+    (MacPorts works too: install it from https://www.macports.org/install.php)"
+        ok "Homebrew ($(brew --prefix))"
+        missing=$(mac_missing brew)
+        if [ -n "$missing" ]; then
+            say "Installing build dependencies:$missing"
+            # shellcheck disable=SC2086
+            brew install $missing || die "brew install failed"
+        fi
+        ok "build dependencies ($BREW_DEPS)"
+    else
+        command -v port >/dev/null 2>&1 || die "MacPorts is required on an Intel Mac (Homebrew no longer supports Intel).
+    Install the package for your macOS version from https://www.macports.org/install.php,
+    open a new terminal, and run $PROG setup again."
+        ok "MacPorts ($(port version 2>/dev/null | sed 's/Version: //'))"
+        missing=$(mac_missing macports)
+        if [ -n "$missing" ]; then
+            say "Installing build dependencies with MacPorts (asks for your password):"
+            hint "$missing"
+            local sudo=
+            [ "$(id -u)" = 0 ] || sudo=sudo
+            # shellcheck disable=SC2086
+            $sudo port -N install $missing || die "port install failed (try: sudo port selfupdate)"
+        fi
+        ok "build dependencies (MacPorts: $PORT_DEPS)"
     fi
-    command -v brew >/dev/null 2>&1 || die "Homebrew is required: https://brew.sh
-    Install it, open a new terminal, and run $PROG setup again."
-    ok "Homebrew ($(brew --prefix))"
-
-    local missing=
-    for p in $BREW_DEPS; do
-        brew list --formula "$p" >/dev/null 2>&1 || missing="$missing $p"
-    done
-    if [ -n "$missing" ]; then
-        say "Installing build dependencies:$missing"
-        # shellcheck disable=SC2086
-        brew install $missing || die "brew install failed"
-    fi
-    ok "build dependencies ($BREW_DEPS)"
 }
 
 setup_build() {
@@ -386,7 +448,10 @@ setup_build() {
         # under Rosetta and makes meson configure an x86_64 build, which then
         # fails on -mcx16/-msse2.
         local py=python3
-        if [ "$HOST_OS" = Darwin ] && [ -x "$(brew --prefix)/opt/python@3/libexec/bin/python3" ]; then
+        if [ "$HOST_OS" = Darwin ] && [ "$(mac_pm)" = macports ] && [ -x /opt/local/bin/python3.13 ]; then
+            py=/opt/local/bin/python3.13
+        elif [ "$HOST_OS" = Darwin ] && command -v brew >/dev/null 2>&1 &&
+             [ -x "$(brew --prefix)/opt/python@3/libexec/bin/python3" ]; then
             py="$(brew --prefix)/opt/python@3/libexec/bin/python3"
         fi
         "$py" -m venv "$venv" && "$venv/bin/python3" -m pip install -q distlib \
@@ -434,16 +499,24 @@ cmd_doctor() {
     local fail=0 v
     say "Host"
     if [ "$IS_MAC" = 1 ]; then
-        [ "$(uname -m)" = arm64 ] && ok "Apple Silicon" || warn "not Apple Silicon ($(uname -m))"
+        apple_silicon && ok "Apple Silicon" || warn "Intel Mac: the Radeon uses Vulkan (MoltenVK), and no AltiVec speed-ups"
         ok "macOS $(sw_vers -productVersion)"
         xcode-select -p >/dev/null 2>&1 && ok "Command Line Tools" || { bad "Command Line Tools missing"; hint "xcode-select --install"; fail=1; }
-        if command -v brew >/dev/null 2>&1; then
+        local mpm mmissing
+        mpm=$(mac_pm)
+        if [ "$mpm" = brew ] && command -v brew >/dev/null 2>&1; then
             ok "Homebrew"
-            for p in $BREW_DEPS; do
-                brew list --formula "$p" >/dev/null 2>&1 || { bad "brew package $p missing"; fail=1; }
-            done
-        else
+        elif [ "$mpm" = macports ] && command -v port >/dev/null 2>&1; then
+            ok "MacPorts"
+        elif [ "$mpm" = brew ]; then
             bad "Homebrew missing (https://brew.sh)"; fail=1
+        else
+            bad "MacPorts missing (https://www.macports.org/install.php)"; fail=1
+        fi
+        if [ "$fail" = 0 ]; then
+            mmissing=$(mac_missing "$mpm")
+            [ -z "$mmissing" ] && ok "build dependencies" \
+                || { bad "packages missing:$mmissing"; hint "$PROG setup"; fail=1; }
         fi
     else
         local pm missing
@@ -688,7 +761,7 @@ parse_run_opts() {
     CPU_MHZ="${PPCOSX_CPU_MHZ:-$CPU_MHZ_DEFAULT}"; MODEL="${PPCOSX_MODEL:-$MODEL_DEFAULT}"
     VERBOSE=0; SNAPSHOT=0; SSH_PORT=; MONITOR=0; TRACE=0; MODE=radeon
     GPU="${PPCOSX_GPU:-}"
-    [ -n "$GPU" ] || { [ "$IS_MAC" = 1 ] && GPU=metal || GPU=vulkan; }
+    [ -n "$GPU" ] || { apple_silicon && GPU=metal || GPU=vulkan; }
     EXTRA=()
     [ -f "$ROM_DEFAULT" ] && ROM="$ROM_DEFAULT"
     while [ $# -gt 0 ]; do
@@ -733,6 +806,7 @@ parse_run_opts() {
     case "$RES" in [0-9]*x[0-9]*) ;; *) die "--res looks like 1024x768" ;; esac
     case "$GPU" in metal|vulkan) ;; *) die "--gpu takes metal or vulkan" ;; esac
     [ "$GPU" = metal ] && [ "$IS_MAC" = 0 ] && die "Metal is macOS only; on $HOST_OS use --gpu vulkan"
+    [ "$GPU" = metal ] && ! apple_silicon && die "the Metal renderer needs an Apple Silicon GPU; on an Intel Mac use --gpu vulkan (the default)"
     [ -z "$CD" ] || [ -f "$CD" ] || die "no such DVD image: $CD"
     if [ -n "$ROM" ]; then
         [ -f "$ROM" ] || die "no such ROM: $ROM"
