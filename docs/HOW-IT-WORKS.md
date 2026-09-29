@@ -267,7 +267,19 @@ references in a bare-metal guest and times them (see
 * **VRAM in System Profiler** shows the size of the VRAM BAR, which
   holds two apertures onto VRAM: twice `--vram`, so 256 MB at the
   default 128.
-* **Leopard** (10.5) has an R300 driver too, but hasn't been tested.
+* **Leopard** works, from 10.5 (a fresh install, or an upgrade of a Tiger
+  disk) through 10.5.8: the ATI kext gives Quartz Extreme, Core Image and
+  OpenGL (tested with Chess). It needed one firmware fix.
+  QEMU's mac99 PCI hole is 1 GB, and OpenBIOS assigns the Radeon's VRAM
+  and register BARs above 0x90000000, but its PCI host `ranges` property
+  advertised only 256 MB (0x80000000-0x8fffffff). Tiger's PCI family
+  ignored that; Leopard's (and Tiger 10.4.0's) drops BARs outside
+  `ranges`, so `getDeviceMemoryWithRegister(0x18)` returned nothing,
+  `ATIRadeon9700::start` failed, and its exit path wrote to the unmapped
+  registers (a panic at DAR 0x4018 on Leopard, 0xE40 on 10.4.0).
+  `firmware/radeon/openbios-ppc` now advertises 1 GB. The retail Leopard
+  DVD image also needs a partition map to boot on OpenBIOS, which
+  `ppcosx install` adds (`tools/apm-wrap.py`).
 * Not implemented: video decode acceleration (`ATIRadeon9700VADriver`),
   TV out, dual-head. Video is decoded by the emulated CPU, with AltiVec
   on NEON (see above). The one AltiVec instruction QuickTime still sends

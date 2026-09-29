@@ -1,7 +1,7 @@
 # Getting started
 
-This walks through everything from a fresh clone to a Tiger desktop with 3D
-acceleration. If something goes wrong, see
+This walks through everything from a fresh clone to a Tiger (or Leopard)
+desktop with 3D acceleration. If something goes wrong, see
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## 1. What you need
@@ -16,16 +16,17 @@ acceleration. If something goes wrong, see
 * **About 25 GB free**: roughly 1.5 GB for the QEMU build, plus the guest
   disk (it grows as you use it, 40 GB maximum by default).
 * **Mac OS X for PowerPC**, which you provide. Either:
-  * a **Tiger (10.4) install DVD image**: `.iso`, `.cdr`, `.dmg` or `.toast`.
-    Use a *retail* DVD (black "X" or the 10.4 "Universal" DVD). The grey
-    discs that shipped with a specific Mac often refuse to install on
-    other models. **or**
+  * a **Tiger (10.4) or Leopard (10.5) install DVD image**: `.iso`, `.cdr`,
+    `.dmg` or `.toast`. Use a *retail* DVD (black "X", the 10.4 "Universal"
+    DVD, or the 10.5 retail DVD). The grey discs that shipped with a
+    specific Mac often refuse to install on other models. **or**
   * an **already installed PowerPC OS X disk image** from another emulator,
     such as a UTM VM (`.utm`), VMware (`.vmdk`), VirtualBox (`.vdi`), or a raw
     `.img`/`.qcow2`.
 
 For the best result, update the guest to **10.4.11** (the "Mac OS X 10.4.11
-Combo Update (PPC)"). That's the version everything is tested on.
+Combo Update (PPC)"). That's the version everything is tested on. For
+Leopard, update to **10.5.8** (the "Mac OS X 10.5.8 Combo Update").
 
 ## 2. Install ppcosx
 
@@ -114,7 +115,7 @@ need; `setup` fetches just the QEMU fork. Without `link`, type `./ppcosx`
 from the checkout wherever these docs say `ppcosx`. Build logs are in
 `qemu/build/ppcosx-*.log`.
 
-## 3a. Install Tiger from a DVD image
+## 3a. Install Tiger or Leopard from a DVD image
 
 ```bash
 ppcosx install ~/Downloads/MacOSX-Tiger.iso
@@ -123,7 +124,9 @@ ppcosx install ~/Downloads/MacOSX-Tiger.iso
 This creates an empty 40 GB disk at `vm/macosx.qcow2`, then boots the DVD in a
 window. `--size 60G` picks a different size. A `.dmg` is first converted
 once to a raw `.cdr` in `vm/`, because QEMU can't read compressed disk
-images.
+images. A Leopard retail DVD image is a bare HFS+ volume that OpenBIOS
+can't boot, so `install` also gives it a partition map, once (the `.cdr`
+in `vm/` is then about 7.6 GB).
 
 In the installer:
 
@@ -142,7 +145,9 @@ In the installer:
    installer runs with QEMU's `-no-reboot`).
 
 The installer uses a plain framebuffer, not the Radeon. It doesn't need 3D,
-and this is the configuration the Tiger installer is known to work with.
+and this is the configuration the Tiger and Leopard installers are known to
+work with. The same steps work for Leopard; its installer takes about 30
+minutes with printer drivers and languages unticked.
 
 ## 3b. …or bring an existing disk
 
@@ -161,20 +166,19 @@ won't boot on this emulated G4.
 
 ## 4. Boot
 
-If you installed from an original 10.4 DVD, update to 10.4.11 first. The
-Radeon driver in 10.4.0 (build 8A428) panics on the emulated card. Boot
-with the plain framebuffer and the Combo Update inserted, run the Setup
-Assistant, install the update, then shut down:
-
-```bash
-ppcosx run --vga --attach-dvd ~/Downloads/MacOSXUpdCombo10.4.11PPC.dmg
-```
-
-Then boot with the Radeon:
-
 ```bash
 ppcosx run
 ```
+
+To install a Combo Update (10.4.11 or 10.5.8), insert it and run it from the
+guest's Finder:
+
+```bash
+ppcosx run --attach-dvd ~/Downloads/MacOSXUpdCombo10.4.11PPC.dmg
+```
+
+The update's last step ("Running Installer Script") can take 30 minutes or
+more under emulation with the progress bar standing still.
 
 The first boot after an install runs the Setup Assistant (the welcome movie,
 then account creation), which can take a few minutes. Then check the
