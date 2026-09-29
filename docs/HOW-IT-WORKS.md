@@ -82,12 +82,22 @@ still for every packet decoded, translated and handed to Metal.
 
 How it stays correct:
 
-* **One lock, as before.** The CP thread holds QEMU's big lock (the BQL)
-  while it replays the ring, just as the emulated CPU did, so every
-  device path keeps the serialisation it was written for: registers,
-  Metal, interrupts, the display refresh. The parallelism comes from TCG
-  running guest code *without* the BQL: the guest only waits when it
+* **One lock, as before — except Metal.** The CP thread holds QEMU's big
+  lock (the BQL) while it replays the ring, just as the emulated CPU did,
+  so every device path keeps the serialisation it was written for:
+  registers, interrupts, the display refresh. The parallelism comes from
+  TCG running guest code *without* the BQL: the guest only waits when it
   touches a device.
+* **Metal encoding is off the BQL entirely.** Register parsing and vertex
+  fetch need the BQL; the Metal half of a draw (texture views, staging,
+  the render-command encoder, the commit) does not — it touches only the
+  renderer's own state and the GPU. `draw_r200`/`draw_r300` on the Metal
+  backend therefore copy the decoded packet onto a lock-free queue and
+  return, and a backend thread encodes the draws in order with no QEMU
+  lock held (see "The render queue" in `ppc_mac_gpu_metal.m`). Flushes,
+  fences, 2D blits, scanout and CPU-side VRAM access all drain the queue
+  first, so ordering with the guest is the same as before.
+  `PPCGPU_RENDER_QUEUE=0` puts the encoding back on the caller's thread.
 * **Catch up before the guest looks.** Any other guest access to the
   card's registers or VRAM apertures first carries out whatever is left
   of the ring, on the accessing thread, then is served. That's exactly
@@ -100,11 +110,14 @@ How it stays correct:
   that's dispatched without the BQL
   (`memory_region_enable_lockless_io()`, backported from QEMU 10.1), so a
   submit doesn't wait for the CP thread to finish a batch.
-* **Long batches share the lock.** Every 200 µs, between two packets, the
-  CP thread publishes its progress as the read pointer and lets go of the
-  BQL, so other devices, the display and further submits get in. If
-  someone catches the ring up meanwhile, the thread sees the ring changed
-  hands (an epoch counter) and drops the rest of its copy.
+* **Long batches share the lock.** Between two packets, if a whole
+  `CP_SLICE_US` (2 ms) of parsing has gone by, the CP thread publishes
+  its progress as the read pointer and lets go of the BQL, so other
+  devices, the display and further submits get in. With Metal encoding
+  queued off-thread a slice is parse work only, so this almost never
+  fires; it exists so a catch-up can take the ring over. If someone
+  catches the ring up meanwhile, the thread sees the ring changed hands
+  (an epoch counter) and drops the rest of its copy.
 
 Tiger's driver never makes the ring catch up in normal use. The `ring:`
 line in `vm/gpu-trace.log` counts submits and catch-ups every second,
