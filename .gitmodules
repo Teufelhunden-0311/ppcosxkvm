@@ -1,5 +1,5 @@
 [submodule "qemu"]
 	path = qemu
-	url = https://github.com/linuxkid473/poweremu-qemu.git
-	branch = r300
+	url = https://github.com/Teufelhunden-0311/poweremu-qemu.git
+	branch = cpu-perf
 	shallow = true
