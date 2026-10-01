@@ -1,5 +1,5 @@
 [submodule "qemu"]
 	path = qemu
 	url = https://github.com/Teufelhunden-0311/poweremu-qemu.git
-	branch = cpu-perf
+	branch = gpu-work
 	shallow = true
