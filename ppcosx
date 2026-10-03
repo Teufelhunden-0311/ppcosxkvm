@@ -615,7 +615,10 @@ cmd_new_disk() {
     local size="${1:-40G}" disk="${2:-$DISK_DEFAULT}"
     [ -e "$disk" ] && die "$disk already exists (delete it first to start over)"
     mkdir -p "$(dirname "$disk")"
-    qemu_img create -q -f qcow2 "$disk" "$size" || die "qemu-img create failed"
+    # lazy refcounts: fewer metadata flushes; metadata preallocation: no
+    # cluster-table growth stalls while the guest installs.
+    qemu_img create -q -f qcow2 -o lazy_refcounts=on,preallocation=metadata "$disk" "$size" \
+        || die "qemu-img create failed"
     ok "created empty $size disk ${disk#$REPO/}"
 }
 
@@ -743,7 +746,7 @@ build_common() {   # $1 = disk, $2 = "cd" when booting from CD
         -machine "$MACHINE" -accel tcg,tb-size=256
         -smp cpus=1,sockets=1,cores=1,threads=1 -m "$RAM"
         "${HOST_UI[@]}"
-        -drive "if=none,media=disk,id=hd,file.filename=$1,discard=unmap,detect-zeroes=unmap"
+        -drive "if=none,media=disk,id=hd,file.filename=$1,discard=unmap,detect-zeroes=unmap,l2-cache-size=64M,cache-clean-interval=0"
         -device "ide-hd,bus=ide.0,unit=0,drive=hd$hdboot")
     [ "$SNAPSHOT" = 1 ] && QARGS+=(-snapshot)
     if [ "$MONITOR" = 1 ]; then
