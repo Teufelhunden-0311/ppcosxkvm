@@ -53,6 +53,27 @@ That's it. It takes a few minutes the first time, and when it's done you
 have a new `ppcosx` command. (If Terminal says `ppcosx: command not found`,
 open a new Terminal window.)
 
+### Installing from this fork
+
+This copy ([Teufelhunden-0311/ppcosxkvm](https://github.com/Teufelhunden-0311/ppcosxkvm))
+is where fixes are tested before they're offered to
+[linuxkid473/ppcosxkvm](https://github.com/linuxkid473/ppcosxkvm), so at
+times it is ahead of it (lately: Linux GPU fixes). To install it instead:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Teufelhunden-0311/ppcosxkvm/main/install.sh | PPCOSX_REPO=https://github.com/Teufelhunden-0311/ppcosxkvm.git bash
+```
+
+Already installed? Switch the existing install over (your Mac OS X disk
+stays where it is):
+
+```bash
+cd ~/.ppcosx && git remote set-url origin https://github.com/Teufelhunden-0311/ppcosxkvm.git && git pull --ff-only && git submodule sync && ppcosx setup
+```
+
+After that, `ppcosx update` keeps following this fork. On Linux it
+downloads this fork's prebuilt QEMU.
+
 ## Set up Mac OS X
 
 Pick **one**:
@@ -143,7 +164,7 @@ Leopard to 10.5.8 with the *10.5.8 Combo Update*.
 | | |
 |---|---|
 | ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess, Quake III Arena), QuickTime video, Aperture 1.5, hardware cursor, keyboard and mouse |
-| 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (built and set up on Ubuntu 24.04; not yet run on a Linux GPU), Intel Macs with MacPorts (not yet run on one) |
+| 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (run on an Intel UHD 630 with Mesa: desktop and Quake III; other GPUs untested), Intel Macs with MacPorts (not yet run on one) |
 | ✅ Leopard | 10.5 to 10.5.8 with Quartz Extreme, Core Image and OpenGL (Chess); installs from the retail DVD image, or upgrades a Tiger disk |
 | ❌ Not yet | Multiple CPUs, video decode acceleration |
 
