@@ -31,7 +31,6 @@ QEMU_BUILD="$QEMU_DIR/build"
 # Linux can use a prebuilt QEMU (GitHub release "qemu-<commit>", made by
 # tools/build-linux-qemu.sh); "ppcosx setup" downloads it into prebuilt/.
 PREBUILT_DIR="$REPO/prebuilt"
-PREBUILT_REPO="${PPCOSX_RELEASES:-linuxkid473/ppcosxkvm}"
 if [ -z "${PPCOSX_QEMU:-}" ] && [ -x "$PREBUILT_DIR/bin/qemu-system-ppc" ]; then
     QEMU="$PREBUILT_DIR/bin/qemu-system-ppc"
     QEMU_IMG_BUILT="$PREBUILT_DIR/bin/qemu-img"
@@ -305,6 +304,26 @@ linux_install() {   # linux_install PM WHAT PACKAGES...: install what's missing
     ok "$what ($pm)"
 }
 
+# GitHub repositories to look in for the prebuilt QEMU, one per line:
+# PPCOSX_RELEASES if set, else the one this checkout was cloned from (a
+# fork that publishes its own builds), then the main project.
+prebuilt_repos() {
+    if [ -n "${PPCOSX_RELEASES:-}" ]; then
+        echo "$PPCOSX_RELEASES"
+        return
+    fi
+    local url r
+    url=$(git -C "$REPO" remote get-url origin 2>/dev/null) || url=
+    case "$url" in
+        *github.com[:/]*/*)
+            r=${url#*github.com[:/]}
+            r=${r%/}
+            r=${r%.git}
+            [ "$r" != linuxkid473/ppcosxkvm ] && echo "$r" ;;
+    esac
+    echo linuxkid473/ppcosxkvm
+}
+
 # The pinned QEMU as a prebuilt download (no compiler needed).  Returns
 # nonzero, having changed nothing that matters, when there isn't one for
 # this machine: the caller then builds QEMU instead.
@@ -328,15 +347,25 @@ setup_linux_prebuilt() {
         return 0
     fi
     case "$(uname -m)" in x86_64|amd64) arch=x86_64 ;; aarch64|arm64) arch=aarch64 ;; *) return 1 ;; esac
-    url="https://github.com/$PREBUILT_REPO/releases/download/qemu-${sha:0:12}/ppcosx-qemu-linux-$arch.tar.xz"
     tmp=$(mktemp -d)
     say "Downloading a prebuilt QEMU (${sha:0:12}, $arch)"
     if [ -n "${PPCOSX_QEMU_TARBALL:-}" ]; then
         cp "$PPCOSX_QEMU_TARBALL" "$tmp/q.tar.xz" || { rm -rf "$tmp"; return 1; }
-    elif ! curl -fsSL -o "$tmp/q.tar.xz" "$url"; then
-        warn "no prebuilt QEMU for this version yet; building it instead"
-        rm -rf "$tmp"
-        return 1
+    else
+        local r got=
+        for r in $(prebuilt_repos); do
+            url="https://github.com/$r/releases/download/qemu-${sha:0:12}/ppcosx-qemu-linux-$arch.tar.xz"
+            if curl -fsSL -o "$tmp/q.tar.xz" "$url"; then
+                got=$r
+                break
+            fi
+        done
+        if [ -z "$got" ]; then
+            warn "no prebuilt QEMU for this version yet; building it instead"
+            rm -rf "$tmp"
+            return 1
+        fi
+        ok "from github.com/$got"
     fi
     if ! tar -C "$tmp" -xJf "$tmp/q.tar.xz" || [ ! -x "$tmp/ppcosx-qemu/bin/qemu-system-ppc" ]; then
         warn "the prebuilt QEMU download is damaged; building QEMU instead"
