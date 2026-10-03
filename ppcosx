@@ -723,7 +723,9 @@ dvd_image() {
 build_common() {   # $1 = disk, $2 = "cd" when booting from CD
     local HOST_UI
     local AUDIO
-    if [ "$IS_MAC" = 1 ]; then AUDIO=coreaudio; HOST_UI=(-display cocoa)
+    # CoreAudio: 8 periods queued (~93 ms) instead of QEMU's 4, so a main
+    # loop delay doesn't empty the host's queue (Screamer keeps it full).
+    if [ "$IS_MAC" = 1 ]; then AUDIO=driver=coreaudio,out.buffer-count=8; HOST_UI=(-display cocoa)
     else AUDIO=pa; HOST_UI=(-display gtk,zoom-to-fit=on); fi
     # --no-audio: the Mac still has its sound chip, but nothing reaches
     # the host's audio system (for hosts where that misbehaves).
