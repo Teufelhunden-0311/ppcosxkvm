@@ -1,0 +1,62 @@
+# "ppcosx setup" on Linux distributions other than the Ubuntu the prebuilt
+# QEMU is made on: their package names (apt, dnf, pacman), whether the
+# prebuilt QEMU runs there, and building QEMU from source with their
+# compilers and libraries.  No GPU here: QEMU only has to start.
+name: Distributions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ppcosx
+      - install.sh
+      - .github/workflows/distros.yml
+  # after a new prebuilt QEMU is published (a qemu/ bump)
+  workflow_run:
+    workflows: [Linux QEMU]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "17 6 * * 1"      # weekly: the distributions move on their own
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - registry.fedoraproject.org/fedora:latest
+          - docker.io/library/archlinux:latest
+          - docker.io/library/debian:testing
+          - docker.io/library/ubuntu:rolling
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.image }}
+    steps:
+      - name: git and curl (install.sh asks the user for these first)
+        run: |
+          if command -v dnf; then dnf install -y git curl
+          elif command -v pacman; then pacman -Syu --noconfirm --needed git curl
+          else apt-get update && apt-get install -y git curl ca-certificates
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: setup (prebuilt QEMU if it runs here)
+        run: |
+          git config --global --add safe.directory '*'
+          ./ppcosx setup < /dev/null
+          if [ -x prebuilt/bin/qemu-system-ppc ]; then q=prebuilt/bin/qemu-system-ppc
+          else q=qemu/build/qemu-system-ppc; fi
+          "$q" -device help | grep -q ati-radeon-9700
+          echo "${{ matrix.image }}: setup used $q" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: setup --build (QEMU from source)
+        run: |
+          ./ppcosx setup --build < /dev/null
+          qemu/build/qemu-system-ppc -device help | grep -q ati-radeon-9700
+          echo "${{ matrix.image }}: setup --build OK" >> "$GITHUB_STEP_SUMMARY"
