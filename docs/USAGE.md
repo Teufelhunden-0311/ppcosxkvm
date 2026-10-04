@@ -94,6 +94,8 @@ presents the card as a **Radeon 9000 PRO**; its R200 3D engine goes through
 the same Metal/Vulkan translation. Quartz Extreme composites the desktop
 and Chess renders in 3D.
 
+![Chess in 3D on Mac OS X 10.2 Jaguar](images/jaguar-chess.png)
+
 Differences from Tiger and Leopard:
 
 * **The mouse is relative.** Jaguar's USB driver reads an absolute tablet
