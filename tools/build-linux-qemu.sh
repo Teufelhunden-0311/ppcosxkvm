@@ -7,8 +7,11 @@
 # qemu-linux.yml runs this on Ubuntu 24.04 (x86_64 and arm64) and
 # attaches the result to the release "qemu-<first 12 of the qemu commit>".
 #
-# Layout: ppcosx-qemu/{bin/qemu-system-ppc, bin/qemu-img, share/pc-bios/,
-# VERSION (the qemu commit)}.
+# Layout: ppcosx-qemu/{bin/qemu-system-ppc, bin/qemu-img, lib/, share/pc-bios/,
+# VERSION (the qemu commit)}.  lib/ has Debian's libshaderc.so.1, which
+# links glslang and SPIRV-Tools in (other distributions split them and
+# name it libshaderc_shared.so.1), so the build runs on those too; the
+# binaries find it through RUNPATH $ORIGIN/../lib (patchelf).
 set -euo pipefail
 
 out=$(realpath -m "${1:?usage: $0 OUT.tar.xz}")
@@ -35,9 +38,13 @@ python3 -m venv "$venv"
 ninja -C "$build" -j "$(nproc)" qemu-system-ppc qemu-img
 
 d="$stage/ppcosx-qemu"
-mkdir -p "$d/bin" "$d/share/pc-bios"
+mkdir -p "$d/bin" "$d/lib" "$d/share/pc-bios"
 cp "$build/qemu-system-ppc" "$build/qemu-img" "$d/bin/"
 strip "$d/bin/"*
+shaderc=$(ldd "$build/qemu-system-ppc" | awk '$1 == "libshaderc.so.1" { print $3 }')
+[ -f "$shaderc" ] || { echo "qemu-system-ppc does not use libshaderc.so.1" >&2; exit 1; }
+cp -L "$shaderc" "$d/lib/"
+patchelf --set-rpath '$ORIGIN/../lib' "$d/bin/qemu-system-ppc"
 # ppcosx passes its own firmware first (-L firmware/...); these cover
 # what QEMU itself looks up.
 cp -r "$qemu/pc-bios/keymaps" "$d/share/pc-bios/"

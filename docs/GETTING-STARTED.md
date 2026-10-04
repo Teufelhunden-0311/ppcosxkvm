@@ -88,7 +88,7 @@ and a GPU with a Vulkan driver). `setup` then:
 
 1. installs what's missing with `apt`, `dnf` or `pacman` (it asks for your
    password): GTK, PulseAudio, the Vulkan loader and Mesa's drivers,
-   shaderc and SPIRV-Cross;
+   and shaderc;
 2. downloads a **prebuilt QEMU** made for exactly this version (a GitHub
    release named `qemu-<commit>`) into `~/.ppcosx/prebuilt`, and checks
    it runs on your system;

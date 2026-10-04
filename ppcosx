@@ -56,22 +56,21 @@ BREW_DEPS="ninja pkgconf glib pixman libslirp shaderc spirv-cross glslang vulkan
 PORT_DEPS="ninja pkgconfig glib2 libpixman libslirp shaderc spirv-cross glslang vulkan-headers vulkan-loader MoltenVK python313"
 # Linux build and run dependencies, per package manager: QEMU's (glib,
 # pixman, slirp, GTK display, PulseAudio/PipeWire sound), the Vulkan
-# loader and a driver, and the shader toolchain (shaderc, SPIRV-Cross).
-# What a prebuilt QEMU needs at run time (Ubuntu 24.04 / Debian 13 names).
+# loader and a driver, and shaderc (SPIRV-Cross is for Metal: macOS only).
+# What a prebuilt QEMU needs at run time (Ubuntu 24.04 / Debian 13 names;
+# it carries its own shaderc).
 APT_RUNTIME_DEPS="git curl ca-certificates xz-utils python3 libglib2.0-0t64
     libpixman-1-0 libslirp0 libgtk-3-0t64 libpulse0 libvulkan1
-    mesa-vulkan-drivers libshaderc1 libspirv-cross-c-shared0"
+    mesa-vulkan-drivers"
 APT_DEPS="build-essential git ninja-build pkg-config python3 python3-venv flex bison
     libglib2.0-dev libpixman-1-dev libslirp-dev libgtk-3-dev libpulse-dev
-    libvulkan-dev mesa-vulkan-drivers libshaderc-dev libspirv-cross-c-shared-dev
-    glslang-tools spirv-tools"
+    libvulkan-dev mesa-vulkan-drivers libshaderc-dev glslang-tools spirv-tools"
 DNF_DEPS="gcc gcc-c++ make git ninja-build pkgconf-pkg-config python3 flex bison
     glib2-devel pixman-devel libslirp-devel gtk3-devel pulseaudio-libs-devel
     vulkan-loader-devel vulkan-headers mesa-vulkan-drivers libshaderc-devel
-    spirv-cross-devel glslang spirv-tools"
+    glslang spirv-tools"
 PACMAN_DEPS="base-devel git ninja pkgconf python flex bison glib2 pixman libslirp
-    gtk3 libpulse vulkan-icd-loader vulkan-headers shaderc spirv-cross glslang
-    spirv-tools"
+    gtk3 libpulse vulkan-icd-loader vulkan-headers shaderc glslang spirv-tools"
 HOST_OS=$(uname -s)
 [ "$HOST_OS" = Darwin ] && IS_MAC=1 || IS_MAC=0
 
@@ -495,8 +494,14 @@ setup_build() {
     # glibc 2.43's const-preserving strchr makes it warn (Ubuntu 26.04).
     # A build configured without it by an older ppcosx is configured
     # again: meson configure in place would also turn QEMU's -Werror back on.
-    if [ -f "$QEMU_BUILD/build.ninja" ] && [ -d "$QEMU_BUILD/subprojects/dtc" ] &&
-       ! grep -Eq 'dtc:werror +: false' "$QEMU_BUILD/ppcosx-configure.log" 2>/dev/null; then
+    # So is one whose native file still says werror = true, once QEMU's
+    # configure no longer writes that with --disable-werror: meson re-reads
+    # it whenever it regenerates the build, and then fails on warnings.
+    if [ -f "$QEMU_BUILD/build.ninja" ] &&
+       { { [ -d "$QEMU_BUILD/subprojects/dtc" ] &&
+           ! grep -Eq 'dtc:werror +: false' "$QEMU_BUILD/ppcosx-configure.log" 2>/dev/null; } ||
+         { grep -q 'has_meson_option -Dwerror=' "$QEMU_DIR/configure" 2>/dev/null &&
+           grep -q '^werror = true' "$QEMU_BUILD/config-meson.cross" 2>/dev/null; }; }; then
         rm -rf "$QEMU_BUILD"
     fi
     mkdir -p "$QEMU_BUILD"
