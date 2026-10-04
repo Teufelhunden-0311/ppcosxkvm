@@ -182,9 +182,37 @@ linux_deps() {   # the package list for $1
     case "$1" in
         apt) echo $APT_DEPS ;;
         dnf) echo $DNF_DEPS ;;
-        pacman) echo $PACMAN_DEPS ;;
+        pacman) echo $PACMAN_DEPS $(pacman_vulkan_drivers) ;;
     esac
 }
+
+# Arch splits Mesa's Vulkan drivers by vendor (Debian's and Fedora's
+# mesa-vulkan-drivers has them all): the ones for the GPUs here, by PCI
+# vendor.  NVIDIA's own driver brings its Vulkan driver along.
+pacman_vulkan_drivers() {
+    local v
+    for v in $(cat /sys/class/drm/card*/device/vendor 2>/dev/null | sort -u); do
+        case "$v" in
+            0x8086) echo vulkan-intel ;;
+            0x1002) echo vulkan-radeon ;;
+            0x10de) pacman -Qq nvidia-utils >/dev/null 2>&1 || echo vulkan-nouveau ;;
+        esac
+    done
+}
+
+# Is a Vulkan driver installed (a manifest where the loader looks for one)?
+vulkan_driver_present() {
+    local d
+    [ -n "${VK_ICD_FILENAMES:-}${VK_DRIVER_FILES:-}" ] && return 0
+    for d in /usr/share/vulkan/icd.d /etc/vulkan/icd.d /usr/local/share/vulkan/icd.d \
+             "${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/icd.d"; do
+        ls "$d"/*.json >/dev/null 2>&1 && return 0
+    done
+    return 1
+}
+VULKAN_HINT="3D needs a Vulkan driver for your GPU: mesa-vulkan-drivers (Debian, Ubuntu,
+    Fedora), vulkan-intel or vulkan-radeon (Arch), or NVIDIA's driver.  Without
+    one, start in safe mode: $PROG --vga"
 
 linux_missing() {   # packages of $1's list (or of list $2) that aren't installed
     local pm="$1" p missing= list="${2:-$(linux_deps "$1")}"
@@ -398,6 +426,11 @@ setup_linux() {
 }
 
 setup_vulkan_check() {
+    if ! vulkan_driver_present; then
+        warn "no Vulkan driver is installed.
+    $VULKAN_HINT"
+        return
+    fi
     if command -v vulkaninfo >/dev/null 2>&1; then
         local gpu
         gpu=$(vulkaninfo --summary 2>/dev/null | sed -n 's/^[[:space:]]*deviceName[[:space:]]*=[[:space:]]*//p' | head -1)
@@ -577,9 +610,13 @@ cmd_doctor() {
         else
             warn "unknown package manager; cannot check dependencies"
         fi
-        if command -v vulkaninfo >/dev/null 2>&1; then
+        if ! vulkan_driver_present; then
+            bad "no Vulkan driver installed"; hint "$VULKAN_HINT"; fail=1
+        elif command -v vulkaninfo >/dev/null 2>&1; then
             vulkaninfo --summary >/dev/null 2>&1 && ok "Vulkan driver" \
                 || { bad "no working Vulkan driver (3D needs one)"; fail=1; }
+        else
+            ok "Vulkan driver installed"
         fi
     fi
 
@@ -936,6 +973,10 @@ cmd_run() {
         boot="$boot \" 1.88\" encode-string \" ATY,Fcode\" property"
         boot="$boot device-end then init-program go"
 
+        if [ "$IS_MAC" = 0 ] && [ "$GPU" = vulkan ] && ! vulkan_driver_present; then
+            die "no Vulkan driver is installed.
+    $VULKAN_HINT"
+        fi
         local dev="ati-radeon-9700,addr=$RADEON_SLOT.0,vgamem_mb=$VRAM,renderer=$GPU"
         if [ -n "$ROM" ]; then dev="$dev,romfile=$ROM,biosrom=$ROM"
         else dev="$dev,romfile="; fi
