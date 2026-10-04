@@ -822,10 +822,17 @@ build_common() {   # $1 = disk, $2 = "cd" when booting from CD
     else
         warn "this QEMU build can't set the CPU speed; run: $PROG update"
     fi
+    # The translated-code cache: QEMU's own size (host RAM / 8, at most
+    # 1 GiB) unless PPCOSX_TB_SIZE (MiB) says otherwise.  When it fills,
+    # QEMU throws all translated code away and translates it again.  Boot
+    # and the desktop alone take ~500 MiB, so 256 filled during ordinary
+    # use; 1 GiB lasted ~45 minutes of benchmarks plus Doom 3.
+    local accel=tcg
+    [ -n "${PPCOSX_TB_SIZE:-}" ] && accel="tcg,tb-size=$PPCOSX_TB_SIZE"
     local hdboot=,bootindex=0
     [ "${2:-}" = cd ] && hdboot=
     QARGS=(-nodefaults -vga none
-        -machine "$MACHINE" -accel "tcg,tb-size=${PPCOSX_TB_SIZE:-256}"
+        -machine "$MACHINE" -accel "$accel"
         -smp cpus=1,sockets=1,cores=1,threads=1 -m "$RAM"
         "${HOST_UI[@]}"
         -drive "if=none,media=disk,id=hd,file.filename=$1,discard=unmap,detect-zeroes=unmap,l2-cache-size=64M,cache-clean-interval=0"
