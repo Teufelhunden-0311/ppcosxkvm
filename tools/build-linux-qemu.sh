@@ -31,10 +31,13 @@ python3 -m venv "$venv"
 "$venv/bin/python3" -m pip install -q distlib
 
 # dtc:werror: see setup_build in ppcosx (the bundled dtc's own -Werror).
+# No VNC JPEG or bzip2 (.dmg images): Ubuntu's libjpeg.so.8 and
+# libbz2.so.1.0 are named otherwise elsewhere (Fedora), and ppcosx uses
+# neither.
 (cd "$build" && ../configure --python="$venv/bin/python3" \
     --target-list=ppc-softmmu --disable-docs --disable-sdl \
     --enable-gtk --enable-pa --enable-slirp --disable-werror -Doptimization=2 \
-    -Ddtc:werror=false)
+    -Ddtc:werror=false --disable-vnc-jpeg --disable-bzip2)
 ninja -C "$build" -j "$(nproc)" qemu-system-ppc qemu-img
 
 d="$stage/ppcosx-qemu"
