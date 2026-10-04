@@ -662,6 +662,7 @@ cmd_import() {
     mv -f "$dst.part" "$dst"
     ok "imported"
     hint "Boot it:  $PROG run$( [ "$dst" != "$DISK_DEFAULT" ] && printf ' --disk %s' "$dst")"
+    hint "(Mac OS X 10.2 Jaguar? Boot it with  $PROG --jaguar$( [ "$dst" != "$DISK_DEFAULT" ] && printf ' --disk %s' "$dst") )"
 }
 
 # ------------------------------------------------------------- snapshots ---
