@@ -13,8 +13,13 @@ Coordinates are guest pixels; the screen size is read from the VM
 (VMCTL_RES=WxH overrides it). An installed Tiger scales tablet input about
 the centre by 1.1775; the installer DVD does not, so set VMCTL_SCALE=1 while
 driving the installer.
+
+With no USB tablet (`ppcosx --jaguar`, whose Mac OS X 10.2 can't use one) the
+pointer is moved with relative events instead, steering by the Radeon's
+hardware-cursor registers until it is within a couple of pixels of the target
+(VMCTL_REL=1 forces this, VMCTL_REL=0 the tablet).
 """
-import socket, sys, time, json, os, subprocess
+import socket, sys, time, json, os, re, subprocess
 
 def hmp(cmd, wait=0.3):
     s = socket.create_connection(('127.0.0.1', 4444))
@@ -112,13 +117,64 @@ def btn(down, b='left'):
     return {'execute': 'input-send-event', 'arguments': {'events': [
         {'type': 'btn', 'data': {'down': down, 'button': b}}]}}
 
+def relative():
+    r = os.environ.get('VMCTL_REL')
+    if r is not None:
+        return r == '1'
+    return 'Tablet' not in hmp('info usb', 0.2)
+
+def hwc_base():
+    # BAR2 of the Radeon (registers); the hardware cursor position is at +0xFF0C
+    m = re.search(r'VGA controller.*?BAR2: 32 bit memory at 0x([0-9a-f]+)',
+                  re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', hmp('info pci', 0.5)), re.S)
+    if not m:
+        sys.exit('vmctl: no Radeon found (info pci)')
+    return int(m.group(1), 16) + 0xFF0C
+
+def pointer(base):
+    o = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', hmp('xp /2wx 0x%x' % base, 0.2))
+    m = re.search(r'%x: 0x(\w+) 0x(\w+)' % base, o)
+    # little-endian words; the cursor image's top-left is the pointer minus 4
+    return (int.from_bytes(bytes.fromhex(m.group(1)), 'little') + 4,
+            int.from_bytes(bytes.fromhex(m.group(2)), 'little') + 4)
+
+def steer(x, y):
+    """Relative motion toward (x, y), correcting from the cursor registers
+    because the guest accelerates the mouse."""
+    base = hwc_base()
+    for _ in range(20):
+        px, py = pointer(base)
+        dx, dy = int(x) - px, int(y) - py
+        if abs(dx) <= 2 and abs(dy) <= 2:
+            return
+        step = lambda d: max(-127, min(127, int(d * 0.6))) or (1 if d > 0 else -1 if d < 0 else 0)
+        hmp('mouse_move %d %d' % (step(dx), step(dy)), 0.12)
+        time.sleep(0.08)
+
+BTN = {'left': 1, 'middle': 2, 'right': 4}
+def rbtn(b, down):
+    hmp('mouse_button %d' % (BTN[b] if down else 0), 0.1)
+
 def move(x, y):
+    if relative():
+        return steer(x, y)
     qmp([absev(x, y)])
 def click(x, y, b='left', n=1):
+    if relative():
+        steer(x, y)
+        for i in range(n):
+            rbtn(b, True); time.sleep(0.08); rbtn(b, False); time.sleep(0.08)
+        return
     qmp([absev(x, y)]); time.sleep(0.15)
     for i in range(n):
         qmp([btn(True, b)]); time.sleep(0.08); qmp([btn(False, b)]); time.sleep(0.08)
 def drag(x0, y0, x1, y1, steps=20):
+    if relative():
+        steer(x0, y0); time.sleep(0.2); rbtn('left', True); time.sleep(0.2)
+        for i in range(1, steps + 1):
+            steer(x0 + (x1 - x0) * i / steps, y0 + (y1 - y0) * i / steps)
+        time.sleep(0.2); rbtn('left', False)
+        return
     qmp([absev(x0, y0)]); time.sleep(0.2); qmp([btn(True)]); time.sleep(0.2)
     for i in range(1, steps + 1):
         qmp([absev(x0 + (x1 - x0) * i / steps, y0 + (y1 - y0) * i / steps)]); time.sleep(0.05)

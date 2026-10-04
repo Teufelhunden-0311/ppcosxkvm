@@ -42,6 +42,7 @@ else
     QEMU_DATA="$QEMU_DIR/pc-bios"
 fi
 FW_RADEON="$REPO/firmware/radeon"
+FW_JAGUAR="$REPO/firmware/jaguar"   # OpenBIOS for the Radeon 9000 PRO (1002:4966), Jaguar
 FW_VGA="$REPO/firmware/vga"
 DISK_DEFAULT="$VM_DIR/macosx.qcow2"
 ROM_DEFAULT="$VM_DIR/roms/radeon9700.rom"
@@ -216,6 +217,7 @@ ${B}First time${N}
 ${B}Every day${N}
   ppcosx                       boot the VM with the Radeon 9700 (3D acceleration)
   ppcosx --vga                 boot with a plain framebuffer (safe mode)
+  ppcosx --jaguar              Mac OS X 10.2 Jaguar (emulated Radeon 9000, Metal only)
   ppcosx --attach-dvd <file>   boot with a DVD/CD image inserted (.iso .dmg ...)
   ppcosx --ram 2048 --verbose  any run option works directly (see below)
   ppcosx doctor                check that everything is in place
@@ -235,12 +237,15 @@ ${B}Run options${N} (for "ppcosx", "ppcosx run" and "ppcosx install")
   --disk PATH      disk image to boot        (default: vm/macosx.qcow2)
   --ram MB         guest memory, 256-2048    (default: 1024)
   --cpu-mhz N      CPU speed Mac OS X sees   (default: $CPU_MHZ_DEFAULT; reporting only)
-  --model NAME     Mac model Mac OS X sees   (default: $MODEL_DEFAULT; "default" = PowerMac3,1)
+  --model NAME     Mac model Mac OS X sees   (default: $MODEL_DEFAULT; "default" = PowerMac3,1;
+                                              --jaguar uses "default")
   --vram MB        Radeon video memory 64/128/256 (default: 128)
   --res WxH        screen size               (default: 1024x768)
   --rom PATH       Radeon ROM to use         (default: vm/roms/radeon9700.rom if present)
   --no-rom         boot without the ROM, even if one is installed
   --vga            plain framebuffer instead of the Radeon
+  --jaguar         Mac OS X 10.2 Jaguar: emulate the Radeon 9000 PRO (R200) that
+                   10.2 has a driver for, instead of the 9700 PRO (also --card 9000)
   --gpu API        host 3D API for the Radeon: metal (macOS default) or
                    vulkan (Linux default; MoltenVK on macOS)
   --gpumetal       same as --gpu metal
@@ -781,7 +786,9 @@ add_net() {
 
 parse_run_opts() {
     DISK="$DISK_DEFAULT"; RAM=1024; VRAM=128; RES=1024x768; ROM=; CD=
-    CPU_MHZ="${PPCOSX_CPU_MHZ:-$CPU_MHZ_DEFAULT}"; MODEL="${PPCOSX_MODEL:-$MODEL_DEFAULT}"
+    CPU_MHZ="${PPCOSX_CPU_MHZ:-$CPU_MHZ_DEFAULT}"; MODEL="${PPCOSX_MODEL:-$MODEL_DEFAULT}"; MODEL_SET=0
+    [ -z "${PPCOSX_MODEL:-}" ] || MODEL_SET=1
+    CARD="${PPCOSX_CARD:-9700}"
     VERBOSE=0; SNAPSHOT=0; SSH_PORT=; MONITOR=0; TRACE=0; MODE=radeon
     NO_AUDIO="${PPCOSX_NO_AUDIO:-0}"
     GPU="${PPCOSX_GPU:-}"
@@ -793,7 +800,7 @@ parse_run_opts() {
             --disk) DISK=$(abspath "$2"); shift ;;
             --ram) RAM="$2"; shift ;;
             --cpu-mhz) CPU_MHZ="$2"; shift ;;
-            --model) MODEL="$2"; shift ;;
+            --model) MODEL="$2"; MODEL_SET=1; shift ;;
             --vram) VRAM="$2"; shift ;;
             --res) RES="$2"; shift ;;
             --rom) ROM=$(abspath "$2"); shift ;;
@@ -802,6 +809,9 @@ parse_run_opts() {
                 [ $# -ge 2 ] || die "$1 needs a path to a .iso, .cdr, .dmg or .toast"
                 CD=$(abspath "$2"); shift ;;
             --vga) MODE=vga ;;
+            --card) [ $# -ge 2 ] || die "--card takes 9700 or 9000"
+                    CARD="$2"; shift ;;
+            --jaguar) CARD=9000 ;;
             --gpumetal) GPU=metal ;;
             --gpuvulkan) GPU=vulkan ;;
             --gpu) [ $# -ge 2 ] || die "--gpu takes metal or vulkan"
@@ -819,6 +829,8 @@ parse_run_opts() {
         esac
         shift
     done
+    # Jaguar predates the PowerBook5,8 that Tiger-era apps want to see.
+    [ "$CARD" = 9000 ] && [ "$MODEL_SET" = 0 ] && MODEL=default
     case "$RAM" in ''|*[!0-9]*) die "--ram takes a number of MB" ;; esac
     [ "$RAM" -ge 256 ] && [ "$RAM" -le 2048 ] || die "--ram must be 256-2048 (mac99 limit is 2 GB)"
     case "$VRAM" in 64|128|256) ;; *) die "--vram must be 64, 128 or 256" ;; esac
@@ -829,6 +841,7 @@ parse_run_opts() {
     esac
     [ "$CPU_MHZ" -ge 100 ] && [ "$CPU_MHZ" -le 4000 ] || die "--cpu-mhz must be 100-4000"
     case "$RES" in [0-9]*x[0-9]*) ;; *) die "--res looks like 1024x768" ;; esac
+    case "$CARD" in 9700|9000) ;; *) die "--card takes 9700 (Tiger/Leopard) or 9000 (Jaguar)" ;; esac
     case "$GPU" in metal|vulkan) ;; *) die "--gpu takes metal or vulkan" ;; esac
     [ "$GPU" = metal ] && [ "$IS_MAC" = 0 ] && die "Metal is macOS only; on $HOST_OS use --gpu vulkan"
     [ "$GPU" = metal ] && ! apple_silicon && die "the Metal renderer needs an Apple Silicon GPU; on an Intel Mac use --gpu vulkan (the default)"
@@ -885,27 +898,41 @@ cmd_run() {
         vram_hex=$(printf %x $((VRAM * 1048576)))
         boot="$(model_forth)\" /pci@f2000000/QEMU,VGA@$RADEON_SLOT\" ['] find-device catch 0= if"
         boot="$boot h# $vram_hex encode-int \" VRAM,totalsize\" property"
-        boot="$boot \" ATY,R300\" encode-string \" model\" property"
-        boot="$boot \" 113-A06500-124\" encode-string \" ATY,Rom#\" property"
-        boot="$boot \" 109-A06501-00\" encode-string \" ATY,Card#\" property"
-        boot="$boot \" 1.88\" encode-string \" ATY,Fcode\" property"
+        if [ "$CARD" = 9700 ]; then
+            boot="$boot \" ATY,R300\" encode-string \" model\" property"
+            boot="$boot \" 113-A06500-124\" encode-string \" ATY,Rom#\" property"
+            boot="$boot \" 109-A06501-00\" encode-string \" ATY,Card#\" property"
+            boot="$boot \" 1.88\" encode-string \" ATY,Fcode\" property"
+        fi
         boot="$boot device-end then init-program go"
 
-        local dev="ati-radeon-9700,addr=$RADEON_SLOT.0,vgamem_mb=$VRAM,renderer=$GPU"
+        local dev="ati-radeon-$CARD,addr=$RADEON_SLOT.0,vgamem_mb=$VRAM,renderer=$GPU"
+        if [ "$CARD" = 9000 ] && [ "$GPU" != metal ]; then
+            # The Radeon 9000's R200 3D engine only has a Metal renderer;
+            # elsewhere the card falls back to the CPU renderer.
+            warn "--jaguar: the R200 3D engine has only a Metal renderer (Apple Silicon); using the software renderer, which is slow and incomplete. $PROG --vga is the safe mode."
+            dev="ati-radeon-$CARD,addr=$RADEON_SLOT.0,vgamem_mb=$VRAM"
+        fi
         if [ -n "$ROM" ]; then dev="$dev,romfile=$ROM,biosrom=$ROM"
         else dev="$dev,romfile="; fi
 
+        # Only the OpenBIOS differs per card (its VGA table has the PCI ID).
+        local FW_BIOS="$FW_RADEON"
+        [ "$CARD" = 9000 ] && FW_BIOS="$FW_JAGUAR"
         export QEMU_PPC_NDRV="$FW_RADEON/qemu_vga_hwc.ndrv"
-        QARGS=(-L "$FW_RADEON" -L "$QEMU_DATA" "${QARGS[@]}"
+        QARGS=(-L "$FW_BIOS" -L "$QEMU_DATA" "${QARGS[@]}"
             -device loader,addr=0x4000000,file="$FW_RADEON/ppc-ndrvloader"
             -prom-env "boot-command=$boot"
             -global uni-north-pci.agp-capable=on
             -device "$dev" -g "${RES}x32"
-            -device usb-tablet,bus=usb-bus.0
             -D "$VM_DIR/gpu-trace.log")
+        # Mac OS X 10.2's USB HID driver reads an absolute pointer as
+        # relative motion (the cursor sticks in a corner): Jaguar gets the
+        # relative usb-mouse only, and the mouse has to be captured.
+        [ "$CARD" = 9000 ] || QARGS+=(-device usb-tablet,bus=usb-bus.0)
         if [ "$TRACE" = 1 ]; then QARGS+=(-trace 'ppc_mac_gpu_*')
         else QARGS+=(-trace ppc_mac_gpu_realize); fi
-        say "Booting ${DISK#$REPO/} with the ATI Radeon 9700 PRO ($VRAM MB, $GPU${ROM:+, ROM $(basename "$ROM")})"
+        say "Booting ${DISK#$REPO/} with the ATI Radeon $CARD PRO ($VRAM MB, $GPU${ROM:+, ROM $(basename "$ROM")})"
     fi
     add_net
     if [ "$IS_MAC" = 1 ]; then
