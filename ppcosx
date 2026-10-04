@@ -825,7 +825,7 @@ build_common() {   # $1 = disk, $2 = "cd" when booting from CD
     local hdboot=,bootindex=0
     [ "${2:-}" = cd ] && hdboot=
     QARGS=(-nodefaults -vga none
-        -machine "$MACHINE" -accel tcg,tb-size=256
+        -machine "$MACHINE" -accel "tcg,tb-size=${PPCOSX_TB_SIZE:-256}"
         -smp cpus=1,sockets=1,cores=1,threads=1 -m "$RAM"
         "${HOST_UI[@]}"
         -drive "if=none,media=disk,id=hd,file.filename=$1,discard=unmap,detect-zeroes=unmap,l2-cache-size=64M,cache-clean-interval=0"
