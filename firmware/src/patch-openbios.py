@@ -15,7 +15,11 @@ Two 4-byte changes:
   fall outside "ranges", so ATIRadeon9700.kext finds no register BAR and
   panics.  This widens the advertised window to 1 GB, matching the hole.
 
-    python3 patch-openbios.py <UTM openbios-ppc> <output>
+    python3 patch-openbios.py <UTM openbios-ppc> <output> [pci-id]
+
+  With "pci-id" (four hex digits, e.g. 4966) the VGA table gets that device
+  of vendor 1002 instead: firmware/jaguar/openbios-ppc is made with 4966,
+  the Radeon 9000 PRO that Mac OS X 10.2's ATIRadeon8500.kext drives.
 
 The input is firmware/vga/openbios-ppc, a copy of
 UTM.app/Contents/Resources/qemu/openbios-ppc from UTM 4.7.5.
@@ -31,6 +35,10 @@ PATCHES = [
 UTM_SHA1 = "95d46d815fe3cf04c498ea551e0f3bb66b7785f7"
 
 src, dst = sys.argv[1], sys.argv[2]
+if len(sys.argv) > 3:
+    dev = sys.argv[3].lower().zfill(4)
+    PATCHES[0] = (PATCHES[0][0], PATCHES[0][1], "1002" + dev,
+                  "VGA table PCI ID -> Radeon 1002:" + dev.upper())
 data = bytearray(open(src, "rb").read())
 if hashlib.sha1(data).hexdigest() != UTM_SHA1:
     print("warning: input is not UTM 4.7.5's openbios-ppc; the offsets may differ")

@@ -31,6 +31,7 @@ without the word `run`: `ppcosx --vga` is `ppcosx run --vga`.
 | `--ram MB` | 1024 | Guest memory, 256–2048. The Power Mac G4 (mac99) tops out at 2 GB. |
 | `--model NAME` | PowerBook5,8 | Mac model Mac OS X is *told* (`hw.model`, System Profiler). A 15" PowerBook G4 by default, because apps such as Aperture only accept a G4 in a PowerBook (a "PowerMac" must have a G5). `--model default` gives the firmware's own `PowerMac3,1`. |
 | `--cpu-mhz N` | 2000 | CPU speed Mac OS X is *told* (100–4000). Shown in About This Mac and checked by apps with minimum requirements. It doesn't change how fast the emulation actually runs. |
+| `--jaguar` (or `--card 9000`) | off (Radeon 9700 PRO) | **Mac OS X 10.2 Jaguar.** Emulates the Radeon 9000 PRO (R200, PCI 1002:4966) that Jaguar's `ATIRadeon8500.kext` drives, instead of the 9700 PRO (Jaguar has no R300 driver). Quartz Extreme and OpenGL (Chess) work. Uses the firmware's own model (`--model default`) and no absolute-pointer tablet; see [Jaguar](#jaguar-mac-os-x-102). `PPCOSX_CARD=9000` sets it by default. |
 | `--vram MB` | 128 | Radeon video memory: 64, 128 or 256. The real 9700 PRO has 128. |
 | `--res WxH` | 1024x768 | Initial screen size. The Radeon mode is tested at 1024×768; other sizes are experimental. |
 | `--rom PATH` / `--no-rom` | `vm/roms/radeon9700.rom` if present | Radeon option ROM. |
@@ -60,7 +61,8 @@ ppcosx run -- -serial stdio                 # extra QEMU flags
 * Keyboard shortcuts that QEMU's own menus use (such as Cmd+Q) may go to
   QEMU instead of the guest. Use the guest's menus if in doubt.
 * In the Radeon mode the pointer is an absolute USB tablet plus a
-  hardware cursor drawn by the emulated card.
+  hardware cursor drawn by the emulated card (not with `--jaguar`:
+  see below).
 * On Linux the window is GTK (zoomed to fit), sound goes to PulseAudio
   (or PipeWire's PulseAudio server), and **Ctrl+Alt+G** releases the mouse.
 
@@ -79,6 +81,34 @@ drive.
 | `vm/gpu-trace.log` | GPU log, rewritten on each boot: first-use notices for 3D features, the texture formats seen, and while the GPU is busy a `rate:` line (draws, 2D operations, flushes a second) and a `ring:` line (command submissions a second). See [DEVELOPING.md](DEVELOPING.md#profiling). |
 | `vm/dvd-*.cdr` | Raw copies of `.dmg` disc images, and partition-mapped copies of bare HFS+ images (the Leopard retail DVD), made by `--attach-dvd` and `ppcosx install`. Safe to delete; they're remade when needed. |
 
+## Jaguar (Mac OS X 10.2)
+
+```bash
+ppcosx import ~/Downloads/MacOSJaguar.img     # a Jaguar disk (qcow2, vmdk, ...)
+ppcosx --jaguar
+```
+
+or `ppcosx --jaguar --disk ~/Downloads/MacOSJaguar.img` to boot a disk
+where it is. 10.2 only has drivers for the R100/R200 Radeons, so `--jaguar`
+presents the card as a **Radeon 9000 PRO**; its R200 3D engine goes through
+the same Metal/Vulkan translation. Quartz Extreme composites the desktop
+and Chess renders in 3D.
+
+![Chess in 3D on Mac OS X 10.2 Jaguar](images/jaguar-chess.png)
+
+Differences from Tiger and Leopard:
+
+* **The mouse is relative.** Jaguar's USB driver reads an absolute tablet
+  as motion and sticks in a corner, so there is no tablet: click the window
+  to capture the mouse (**Ctrl+Option+G** releases it), as with a real
+  mouse. `tools/vmctl.py click` (absolute) therefore doesn't work; drive the
+  pointer with the monitor's `mouse_move dx dy` / `mouse_button`.
+* Installing from a Jaguar disc works like Tiger (`ppcosx install disc.iso`,
+  which uses the plain framebuffer for the installer); run the installed
+  system with `--jaguar`.
+* `--vga` (plain framebuffer, no 3D) also boots Jaguar.
+* Not R300-class: there is no Core Image (it needs 10.4 anyway).
+
 ## Environment variables
 
 Defaults you can set once in your shell profile instead of on every run:
@@ -89,6 +119,7 @@ Defaults you can set once in your shell profile instead of on every run:
 | `PPCOSX_GPU` | `metal` or `vulkan`, like `--gpu`. |
 | `PPCOSX_CPU_MHZ` | Like `--cpu-mhz`. |
 | `PPCOSX_MODEL` | Like `--model`. |
+| `PPCOSX_CARD` | `9700` (default) or `9000`, like `--card`. |
 | `PPCOSX_QEMU` | A different `qemu-system-ppc` to run (e.g. your own build). |
 | `PPCOSX_PKG` | macOS: `brew` or `macports`, the package manager `setup` uses (default: Homebrew on Apple Silicon, MacPorts on Intel, whichever is installed). |
 

@@ -293,6 +293,27 @@ references in a bare-metal guest and times them (see
   `firmware/radeon/openbios-ppc` now advertises 1 GB. The retail Leopard
   DVD image also needs a partition map to boot on OpenBIOS, which
   `ppcosx install` adds (`tools/apm-wrap.py`).
+* **Jaguar (10.2)** runs on a different card. 10.2 has drivers only for the
+  R100/R200 Radeons (`ATIRadeon.kext`, `ATIRadeon8500.kext`), so
+  `ppcosx --jaguar` presents the device as a **Radeon 9000 PRO** (RV250,
+  1002:4966, `firmware/jaguar/openbios-ppc`): the same register model and
+  R200 3D engine the device started from, through the Metal renderer
+  (the Vulkan one is R300-only). What it took:
+  * The R200 Metal fragment shaders had never been compiled on a current
+    macOS: function constants may not have initialisers there.
+  * `ATIRadeon8500`'s `set_display_mode_and_vram` reserves the scanout
+    buffer in its VRAM pool only when `CRTC_OFFSET` differs from a
+    zero-initialised cache. With the framebuffer at VRAM 0 nothing was
+    reserved, the first GL surface (3 MB, at pool offset 0, which the
+    driver also uses to mean "not allocated") was allocated twice, and
+    `ATIR200Memory::alloc` looped forever on a self-linked free list
+    (WindowServer stopped on the blue desktop). The card now reports
+    `CRTC_OFFSET` 32 bytes in; the accelerator draws the screen from
+    there (starting at x = 8), so the scanout starts there too.
+  * Floating-point vertex colours are blue first: WindowServer fills the
+    margin around windows with the Aqua blue, which was brown.
+  * 10.2's USB HID driver reads an absolute tablet as relative motion, so
+    the card gets only the relative `usb-mouse`.
 * Not implemented: video decode acceleration (`ATIRadeon9700VADriver`),
   TV out, dual-head. Video is decoded by the emulated CPU, with AltiVec
   on NEON (see above). The one AltiVec instruction QuickTime still sends

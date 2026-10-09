@@ -165,6 +165,7 @@ Leopard to 10.5.8 with the *10.5.8 Combo Update*.
 |---|---|
 | ✅ Works | Desktop with Quartz Extreme, Core Image, OpenGL (Chess, Quake III Arena), QuickTime video, Aperture 1.5, hardware cursor, keyboard and mouse |
 | 🟡 Should work, less tested | Installing from a DVD image, networking, sound, resolutions other than 1024×768, Linux hosts (run on an Intel UHD 630 with Mesa: desktop and Quake III; other GPUs untested), Intel Macs with MacPorts (not yet run on one) |
+| ✅ Jaguar | Mac OS X 10.2 with `ppcosx --jaguar` (an emulated Radeon 9000 PRO): Quartz Extreme and OpenGL (Chess); relative mouse, see [USAGE](docs/USAGE.md#jaguar-mac-os-x-102) |
 | ✅ Leopard | 10.5 to 10.5.8 with Quartz Extreme, Core Image and OpenGL (Chess); installs from the retail DVD image, or upgrades a Tiger disk |
 | ❌ Not yet | Multiple CPUs, video decode acceleration |
 
