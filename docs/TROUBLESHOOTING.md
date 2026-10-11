@@ -133,6 +133,12 @@ pointer is an absolute tablet, so it should track 1:1 at 1024×768.
 today's HTTPS. See [USAGE.md](USAGE.md#getting-files-in-and-out) for other
 ways to move files.
 
+**`loadvm` fails with "version_id 1 is too old".** Machine states saved from
+the QEMU monitor (`savevm`) by builds before the 256-color fix can't be
+loaded any more; the display's saved layout changed. Guest disks and
+`ppcosx snapshot` disk snapshots are unaffected: boot the VM normally and
+save a new state.
+
 ## Reporting a bug
 
 Please include:
