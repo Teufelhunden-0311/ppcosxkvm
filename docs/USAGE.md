@@ -57,7 +57,13 @@ ppcosx run -- -serial stdio                 # extra QEMU flags
 
 ## Keyboard and mouse
 
-* Click the window to capture the mouse; **Ctrl+Option+G** releases it.
+* With the Radeon 9700 the guest's pointer follows the Mac's one directly
+  (an absolute tablet): no capturing. Games that turn with the mouse
+  (Halo, Doom 3, Quake III) need it locked to the window: press
+  **Ctrl+Option+G**, and again to release it. While the pointer is over the
+  window, Cmd shortcuts go to the guest.
+* Jaguar (Radeon 9000) and Linux: click the window to capture the mouse;
+  **Ctrl+Option+G** releases it.
 * Keyboard shortcuts that QEMU's own menus use (such as Cmd+Q) may go to
   QEMU instead of the guest. Use the guest's menus if in doubt.
 * In the Radeon mode the pointer is an absolute USB tablet plus a

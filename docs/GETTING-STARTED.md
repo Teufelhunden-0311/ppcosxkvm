@@ -188,8 +188,10 @@ should say **ATI Radeon 9700 Pro**, with *Quartz Extreme: Supported* and
 
 Things to know:
 
-* **Mouse capture.** Click in the window to use the guest. **Ctrl+Option+G**
-  gives the mouse back to macOS.
+* **Mouse.** On a Mac the guest's pointer follows the Mac's one; there is
+  nothing to capture. For games that turn with the mouse, **Ctrl+Option+G**
+  locks it to the window, and pressing it again gives it back. On Linux,
+  click in the window to use the guest; **Ctrl+Alt+G** gives the mouse back.
 * **Shutting down.** Use **Apple menu → Shut Down** in the guest, then the
   window closes. Closing the window or pressing Cmd+Q is like pulling the
   plug: fine in an emergency, but journaled HFS+ will have to replay its
