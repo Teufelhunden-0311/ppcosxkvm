@@ -139,6 +139,12 @@ loaded any more; the display's saved layout changed. Guest disks and
 `ppcosx snapshot` disk snapshots are unaffected: boot the VM normally and
 save a new state.
 
+**A state loaded with `-loadvm` shows a frozen desktop.** States saved by
+builds before October 2026 left out the AGP bridge's settings, so a VM
+started fresh from one stops drawing (Mac OS X keeps running behind it).
+Boot normally and save a new state. States saved by newer builds can't be
+loaded by older ones ("Unknown savevm section ... uni-north-pci").
+
 ## Reporting a bug
 
 Please include:
