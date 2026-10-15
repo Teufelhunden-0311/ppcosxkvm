@@ -36,7 +36,7 @@ without the word `run`: `ppcosx --vga` is `ppcosx run --vga`.
 | `--res WxH` | 1024x768 | Initial screen size. The Radeon mode is tested at 1024×768; other sizes are experimental. |
 | `--rom PATH` / `--no-rom` | `vm/roms/radeon9700.rom` if present | Radeon option ROM. |
 | `--gpu metal\|vulkan` (or `--gpumetal`, `--gpuvulkan`) | Metal on Apple Silicon, Vulkan on Intel Macs and Linux | Host 3D API for the Radeon. On a Mac, Vulkan runs through MoltenVK. Metal needs an Apple GPU. Asking for one the host can't provide stops with the reason. |
-| `--attach-dvd IMG` (or `--dvd`, `--cd`) | | Insert a DVD/CD image (`.iso` `.cdr` `.dmg` `.toast`), e.g. to install software from a disc. A `.dmg` is converted once to a raw `.cdr` in the VM folder (QEMU can't read compressed `.dmg`s). |
+| `--attach-dvd IMG` (or `--dvd`, `--cd`) | | Insert a DVD/CD image (`.iso` `.cdr` `.dmg` `.toast`), e.g. to install software from a disc. A `.dmg` is converted once to a raw `.cdr` in the VM folder (QEMU can't read compressed `.dmg`s). Without it the CD drive starts empty; on a Mac, swap discs while the VM runs from QEMU's **Machine** menu (*Change cd…*, after ejecting the old disc in Mac OS X). That menu takes `.iso` `.cdr` `.toast` as they are, not `.dmg`. |
 | `--verbose` (or `-v`) | off | Text-mode ("verbose") boot instead of the grey Apple. Good for diagnosing hangs. |
 | `--snapshot` | off | Throwaway session: all disk writes are discarded when QEMU exits. The disk must not be in use by another VM. |
 | `--no-audio` | off | No sound: the guest keeps its sound hardware, but QEMU uses no host audio backend (`-audio none`). For hosts where CoreAudio or PulseAudio misbehaves. `PPCOSX_NO_AUDIO=1` sets it by default. |
@@ -165,4 +165,5 @@ written to the disk at all.
   Tiger's OpenSSH is old; from a modern Mac you may need
   `ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -p 2222 user@127.0.0.1`.
 * **Disc images**: `hdiutil makehybrid -hfs -iso -o files.iso some-folder/`
-  on the Mac, then `ppcosx --attach-dvd files.iso`.
+  on the Mac, then `ppcosx --attach-dvd files.iso`, or, with the VM
+  running, QEMU's **Machine** menu → *Change cd…*.

@@ -955,11 +955,16 @@ cmd_run() {
     build_common "$DISK"
     [ "$VERBOSE" = 1 ] && QARGS+=(-prom-env 'boot-args=-v')
     QARGS+=(-usb -device usb-mouse,bus=usb-bus.0 -device usb-kbd,bus=usb-bus.0)
+    # The CD drive is always there, empty unless --attach-dvd gave it a disc:
+    # QEMU's Machine menu (Removable Media, "Change cd...") puts one in while
+    # the VM runs.
+    local cdfile=
     if [ -n "$CD" ]; then
         dvd_image "$CD"
-        QARGS+=(-drive "if=none,media=cdrom,id=cd,readonly=on,file=$DVD_PATH"
-                -device ide-cd,bus=ide.0,unit=1,drive=cd)
+        cdfile=",file=$DVD_PATH"
     fi
+    QARGS+=(-drive "if=none,media=cdrom,id=cd,readonly=on$cdfile"
+            -device ide-cd,bus=ide.0,unit=1,drive=cd)
 
     if [ "$MODE" = vga ]; then
         # UTM's "PowerPC G4" preset: QEMU VGA with the QEMU NDRV.  No 3D.
