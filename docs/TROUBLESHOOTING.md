@@ -146,7 +146,10 @@ save a new state.
 builds before October 2026 left out the AGP bridge's settings, so a VM
 started fresh from one stops drawing (Mac OS X keeps running behind it).
 Boot normally and save a new state. States saved by newer builds can't be
-loaded by older ones ("Unknown savevm section ... uni-north-pci").
+loaded by older ones ("Unknown savevm section ... uni-north-pci", or an
+error loading the `ppc-mac-gpu` device). States saved before the 3D
+engine's state was kept still load; Mac OS X's driver sets the 3D engine
+up again on its next frame.
 
 ## Reporting a bug
 
