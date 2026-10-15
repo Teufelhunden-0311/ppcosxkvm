@@ -1029,7 +1029,11 @@ cmd_run() {
         say "Booting ${DISK#$REPO/} with the ATI Radeon $CARD PRO ($VRAM MB, $GPU${ROM:+, ROM $(basename "$ROM")})"
     fi
     add_net
-    if [ "$IS_MAC" = 1 ]; then
+    if [ "$IS_MAC" = 1 ] && [ "$CARD" != 9000 ]; then
+        # The window keeps the tablet in front (ui/cocoa.m); Jaguar has none.
+        hint "Mouse lock for games that turn with the mouse: Ctrl+Option+G (again to release)."
+        hint "Quit: shut down Mac OS X.  Cmd keys go to Mac OS X while the pointer is over the window."
+    elif [ "$IS_MAC" = 1 ]; then
         hint "Release the mouse: Ctrl+Option+G.  Quit: shut down Mac OS X, or Cmd+Q the QEMU window."
     else
         hint "Release the mouse: Ctrl+Alt+G.  Quit: shut down Mac OS X, or close the QEMU window."

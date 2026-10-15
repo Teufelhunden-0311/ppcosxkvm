@@ -125,9 +125,12 @@ by `qemu/tests/ppc-vmx/run.py`. If you find a program that computes
 differently here than on a real Mac, please report it with the program
 and what it does.
 
-**The mouse pointer and the guest's cursor don't line up.** Release and
-re-capture the mouse (Ctrl+Option+G, then click). In the Radeon mode the
-pointer is an absolute tablet, so it should track 1:1 at 1024×768.
+**The mouse pointer and the guest's cursor don't line up, or the pointer
+is too fast.** In the Radeon mode the pointer is an absolute tablet and
+should track 1:1. If the window title says to press Ctrl+Option+G to
+release the mouse, the game lock is on: press Ctrl+Option+G to go back to
+the tablet. (Builds before October 2026 could leave a relative mouse in
+charge, which macOS and Mac OS X both accelerated.)
 
 **Safari can't open modern websites.** Tiger's TLS is too old for most of
 today's HTTPS. See [USAGE.md](USAGE.md#getting-files-in-and-out) for other
