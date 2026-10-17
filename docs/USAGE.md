@@ -140,6 +140,31 @@ The emulated Radeon also reads debug and fallback switches (such as
 `PPCGPU_CP_SYNC=1`); those are listed in
 [DEVELOPING.md](DEVELOPING.md#debug-switches).
 
+### Single-precision shadows (on by default)
+
+The emulated CPU keeps a single-precision copy of floating-point values
+that a loop carries from one pass to the next (a running sum, say), so
+it doesn't convert them on every pass. It is **on by default**. To turn
+it off for one run:
+
+```
+PPC_SP_SHADOW=0 ppcosx run
+```
+
+The trade, measured on Tiger (October 2026, Apple M1 Max):
+
+| | On (default) | Off |
+|---|---|---|
+| Geekbench 2 Dot Product (scalar) | **+40%** | baseline |
+| Geekbench 2 Sharpen / Blur Image | −3% | baseline |
+| Geekbench 2 overall score | same | same |
+| Quake III timedemo | −1.4% | baseline |
+| Doom 3 timedemo | −1.7% | baseline |
+
+So if a game or app matters more to you than this kind of number
+crunching, `PPC_SP_SHADOW=0` may make it a little faster. Results are
+the same either way; only speed changes.
+
 ## Snapshots
 
 qcow2 disks can hold snapshots of themselves. With the VM **shut down**:

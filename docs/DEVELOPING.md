@@ -175,6 +175,11 @@ paravirtual GPU's self-test or replay a capture, then exit.
 | Variable | Effect |
 |---|---|
 | `PPC_STRICT_FP=1` | Turn off the host-FPU fast path for scalar floating point (always softfloat). |
+| `PPC_SP_SHADOW=0\|1\|2` | Single-precision shadows (`fp-impl.c.inc`): `2` (default) for values a loop carries across translation blocks, `1` for every single input, `0` off. See [USAGE.md](USAGE.md#single-precision-shadows-on-by-default) for the measured trade. |
+| `PPC_SP_SHADOW_STATS=1\|lo-hi` | Count shadow hits and misses (all code, or guest addresses lo-hi) on stderr. Slows the guest; not for timing. |
+| `PPC_SP_BRANCH=0` | Gate the single-precision input check by ORing it into the result (the old way) instead of a branch; turns the shadows off. |
+| `PPC_SP_INPUTS=0` | Don't treat inputs that passed the single check as known singles for the rest of the block. |
+| `PPC_SP_SHADOW_DSE=0` | Keep every shadow store (no dead-store removal). |
 | `PPC_TLBIE=page` | `tlbie` flushes only the named page instead of the whole TLB. |
 | `PPC_FAULT_WATCH=lo-hi` | Log user-mode DSI/ISI faults at addresses in [lo, hi] (hex) to `/tmp/ppc_fault.log`, with registers and the code around NIP and LR. |
 

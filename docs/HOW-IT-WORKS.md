@@ -250,6 +250,15 @@ it back:
   this project builds on: `fadd`, `fmul`, `fmadd` and the rest compute on
   the host in the state Mac OS X runs applications in (round to nearest,
   no FP exceptions enabled). `PPC_STRICT_FP=1` turns this off.
+* **Single precision across blocks.** A single-precision value kept in a
+  64-bit register has to be checked and converted at every use. Inside a
+  translation block the translator remembers what it has checked; for a
+  loop's running sum, carried from block to block, it also keeps a
+  single-precision shadow copy, valid only while it converts to the
+  register's exact bits (so no instruction ever has to invalidate it).
+  Geekbench 2's scalar Dot Product runs 60% faster than before; games
+  and image filters lose 1–3% (`PPC_SP_SHADOW=0` turns it off; see
+  [USAGE.md](USAGE.md#single-precision-shadows-on-by-default)).
 * **Host-side display.** `ui/cocoa.m` tags the frame with the window's
   colour space, so Core Animation doesn't spend the main thread
   colour-converting every frame.
