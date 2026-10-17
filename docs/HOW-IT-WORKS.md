@@ -256,9 +256,13 @@ it back:
   loop's running sum, carried from block to block, it also keeps a
   single-precision shadow copy, valid only while it converts to the
   register's exact bits (so no instruction ever has to invalidate it).
-  Geekbench 2's scalar Dot Product runs 60% faster than before; games
-  and image filters lose 1–3% (`PPC_SP_SHADOW=0` turns it off; see
-  [USAGE.md](USAGE.md#single-precision-shadows-on-by-default)).
+  In the Tiger/M1 Max tests, enabling shadows improved Geekbench 2's
+  scalar Dot Product by about 40% compared with shadows off, while the
+  tested games and image filters were about 1–3% slower
+  (`PPC_SP_SHADOW=0` turns it off; see
+  [USAGE.md](USAGE.md#single-precision-shadows-on-by-default)). The whole
+  change (branch check, input facts and shadows) took that test from 596
+  to 964, about +62% against the old configuration.
 * **Host-side display.** `ui/cocoa.m` tags the frame with the window's
   colour space, so Core Animation doesn't spend the main thread
   colour-converting every frame.

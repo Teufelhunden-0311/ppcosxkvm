@@ -142,28 +142,33 @@ The emulated Radeon also reads debug and fallback switches (such as
 
 ### Single-precision shadows (on by default)
 
-The emulated CPU keeps a single-precision copy of floating-point values
-that a loop carries from one pass to the next (a running sum, say), so
-it doesn't convert them on every pass. It is **on by default**. To turn
-it off for one run:
+The emulated CPU keeps a single-precision shadow of values used by
+recurrence-shaped operations, such as a loop's running sum. This avoids
+narrowing the register's double back to single on each iteration; the
+shadow is checked against the register's exact bits before it is used.
+It is **on by default**. To turn it off for one run:
 
 ```
 PPC_SP_SHADOW=0 ppcosx run
 ```
 
-The trade, measured on Tiger (October 2026, Apple M1 Max):
+The trade, shadows on against off (the rest of the speedup stays on),
+measured on Tiger (October 2026, Apple M1 Max):
 
 | | On (default) | Off |
 |---|---|---|
 | Geekbench 2 Dot Product (scalar) | **+40%** | baseline |
 | Geekbench 2 Sharpen / Blur Image | −3% | baseline |
-| Geekbench 2 overall score | same | same |
+| Geekbench 2 overall score | about the same | baseline |
 | Quake III timedemo | −1.4% | baseline |
 | Doom 3 timedemo | −1.7% | baseline |
 
-So if a game or app matters more to you than this kind of number
-crunching, `PPC_SP_SHADOW=0` may make it a little faster. Results are
-the same either way; only speed changes.
+Game percentages are throughput changes from ratios of medians, with
+three paired runs per setting; Geekbench used two runs per setting. They
+describe the tested games and image filters, not every application. If
+a game or app matters more to you than this kind of number crunching,
+`PPC_SP_SHADOW=0` may make it a little faster. The setting is designed
+to preserve numerical results.
 
 ## Snapshots
 
