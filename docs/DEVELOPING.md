@@ -297,3 +297,40 @@ These each cost real time. See `git log` in `qemu/` for the details.
   text leave garbage.
 * Vulkan: write back only the rectangles draws touched, never whole
   images, or CPU 2D blits into the same buffer get undone.
+* On the M1 Max, keep one access type for an `env` slot that generated code
+  stores and reloads. An integer store, then an FP store, then an integer
+  reload of the same slot, with `[env, #imm]` addressing, made Geekbench 2's
+  LU about 30% slower. With `[env, reg]` addressing, or with matching store
+  types, the slowdown goes away. The results stay correct; only the timing
+  changes. It has happened twice: an integer store to `fprf_res` in `fcmpu`
+  (fixed with a vector store), and the layout experiment below.
+
+## Measured and dropped
+
+Ideas that sounded like wins and were measured on Tiger on an M1 Max.
+Each one is correct, but none was faster where it mattered. Check here
+before trying one again. Notes on each are in the commit messages and on
+the local branches named.
+
+* **More TCG temps per block** (`TCG_MAX_TEMPS` 512 → 2048, `tcg/tcg.c`).
+  Long inline-FP blocks run out of temps, and QEMU translates them again
+  at half the length. Each piece loses what the block knew about
+  single-precision values. That is why Doom 3 misses most of its
+  single-precision shadows. 2048 cut Doom 3's shadow reads and stale reads
+  by about 79% each (the miss rate stayed about 43%). Doom 3 demo1 took
+  212.1 s against 214.2 s (median of 3; the base runs alone varied by
+  5.6%). Geekbench 2 was unchanged. No gain, so it was not merged.
+* **FP and AltiVec registers within one load of `env`** (moving the 64 KB
+  `spr_cb` to the end of `CPUPPCState`, which takes `vsr[]` from offset
+  71136 to 5600). Generated code gets shorter, and AltiVec Dot Product was
+  about 16% faster. But Geekbench 2 lost about 4% overall: LU −30%,
+  Blur −22%, Sharpen −20%, Lua −15% (4 runs each, two orders). The cause
+  is the M1 store-forwarding pattern above. The old layout avoided it only
+  because those offsets were too far for `[env, #imm]`. A narrower retry
+  (only `stfd`'s reload of the FPR in register-offset form) is untested.
+* **Inline `lfs`/`stfs` conversions before native FP existed**, and
+  **`TCG_CALL_NO_WG` on the fastfp helpers**. Neither moved Geekbench 2.
+  (`lfs` and `stfs` were later inlined on top of native FP, where they did
+  help loops but not Dot Product.) A large `sample` share for a cheap
+  helper is often latency stall, not removable work. Only an A/B run
+  shows the real gain.
