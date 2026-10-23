@@ -138,6 +138,7 @@ e.g. `R300_DRAWLOG=/tmp/draws.log ppcosx run --snapshot --verbose`.
 | `PPCGPU_ASYNC_FENCE=0`, `1` or `2` | Fence (scratch register) completion: 0 synchronous, 1 always deferred until the GPU finishes, 2 (default) wait briefly, then defer. |
 | `PPCGPU_FENCE_WAIT_US=n` | How long mode 2 waits for the GPU before deferring (default 250). |
 | `PPCGPU_SPLIT=0` | Metal: on a read-after-write hazard, wait for the batch instead of splitting it into a new command buffer ordered by a shared event. |
+| `PPCGPU_MSL_CACHE=1` or an absolute directory | Metal: keep converted shaders (GLSL to MSL) on disk and reuse them in later sessions, so those sessions skip most shader conversion. Off by default. `1` uses `~/Library/Caches/ppcosxkvm/msl`; an absolute directory is used instead. The cache identity includes the QEMU and converter build UUIDs, the translation settings, the cache format and the macOS build; a changed identity uses a separate folder. Old folders stay until you delete them (deleting loses nothing but time). A warm session can still meet new shader variants and convert those. |
 | `PPCGPU_CSQ=busy` or `idle` | Force the command-queue status reply (default: real occupancy). |
 | `PPCGPU_VK_CHECK=1` | Vulkan backend: log textures that changed in VRAM without the backend being told, and CPU writes over rendering not yet written back. |
 | `PPCGPU_VK_DEVICE=n` | Vulkan backend: use Vulkan device number *n* instead of the first discrete (else integrated) GPU. |
