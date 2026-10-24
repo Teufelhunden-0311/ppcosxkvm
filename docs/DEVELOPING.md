@@ -129,6 +129,9 @@ e.g. `R300_DRAWLOG=/tmp/draws.log ppcosx run --snapshot --verbose`.
 | `R300_SURFWATCH=1` | Log CPU accesses to the VRAM range the driver maps through a `SURFACE` register (e.g. depth readback for picking). |
 | `R300_SYNC=1` | Flush to Metal after every draw instead of batching (isolates ordering bugs). |
 | `R300_CPU_VS=1` | Run every vertex program in the CPU interpreter instead of on the GPU. |
+| `R300_ENDIAN_MODEL=0` | Turn off the byte-order model (on by default), which converts textures and render targets between the card's byte order and Metal's/Vulkan's by the guest's swap settings. It matched a real PowerBook's Radeon 9700 on our test programs, but it is not proven on every path; `0` restores the older behaviour, to check whether a graphics bug comes from the model. |
+| `R300_RT_LE=0` | With the model off: also turn off its predecessor, the record of render targets kept in card byte order. |
+| `R300_AP0_SURFACES=0` | With the model on: leave out only its conversion of CPU reads through VRAM aperture 0 inside a `SURFACE` register that sets no swap (such as `glGetTexImage` after `glCopyTexImage2D`). |
 
 **The device, the ring and the backends:**
 
